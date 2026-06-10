@@ -2,7 +2,7 @@ package com.retentionos.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-
+import java.util.List;
 import java.time.LocalDateTime;
 
 @Entity
@@ -33,4 +33,6 @@ public class Business {
     private SubscriptionStatus subscriptionStatus;
 
     private LocalDateTime createdAt;
+    @OneToMany(mappedBy = "business")
+    private List<Customer> customers;
 }

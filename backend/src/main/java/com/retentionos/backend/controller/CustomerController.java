@@ -10,19 +10,22 @@ import com.retentionos.backend.service.CustomerService;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/customers")
+@RequestMapping("/businesses")
 @RequiredArgsConstructor
 public class CustomerController {
 
     private final CustomerService customerService;
 
-    @PostMapping
-    public Customer createCustomer(@RequestBody Customer customer) {
-        return customerService.createCustomer(customer);
-    }
+  @PostMapping("/{businessId}/customers")
+public Customer createCustomer(
+        @PathVariable Long businessId,
+        @RequestBody Customer customer
+) {
+    return customerService.createCustomer(businessId, customer);
+}
 
-    @GetMapping
-    public List<Customer> getAllCustomers() {
-        return customerService.getAllCustomers();
-    }
+  @GetMapping("/{businessId}/customers")
+public List<Customer> getCustomersByBusiness(@PathVariable Long businessId) {
+    return customerService.getCustomersByBusiness(businessId);
+}
 }
