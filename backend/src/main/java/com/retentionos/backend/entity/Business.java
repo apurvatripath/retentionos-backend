@@ -3,6 +3,10 @@ package com.retentionos.backend.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -34,5 +38,6 @@ public class Business {
 
     private LocalDateTime createdAt;
     @OneToMany(mappedBy = "business")
+    @JsonIgnore
     private List<Customer> customers;
 }
