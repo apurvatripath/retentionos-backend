@@ -11,6 +11,7 @@ import com.retentionos.backend.repository.CustomerRepository;
 import com.retentionos.backend.dto.RetentionMessageResponse;
 import com.retentionos.backend.entity.Business;
 import com.retentionos.backend.repository.BusinessRepository;
+import com.retentionos.backend.dto.DashboardResponse;
 
 
 import lombok.RequiredArgsConstructor;
@@ -65,6 +66,17 @@ public class CustomerService {
                             + " for a while. Visit us again soon!"
             ))
             .toList();
+}
+public DashboardResponse getDashboard(Long businessId) {
+    long totalCustomers = customerRepository.findByBusinessId(businessId).size();
+    long inactiveCustomers = getInactiveCustomers(businessId).size();
+    long activeCustomers = totalCustomers - inactiveCustomers;
+
+    return new DashboardResponse(
+            totalCustomers,
+            activeCustomers,
+            inactiveCustomers
+    );
 }
 
 }
