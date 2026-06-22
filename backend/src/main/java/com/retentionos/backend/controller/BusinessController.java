@@ -23,4 +23,12 @@ public class BusinessController {
     public List<Business> getAllBusinesses() {
         return businessService.getAllBusinesses();
     }
+    @GetMapping("/trial-expiring")
+public List<Business> getTrialExpiringBusinesses() {
+    return businessService.getTrialExpiringBusinesses();
+}
+@GetMapping("/subscription-expired")
+public List<Business> getSubscriptionExpiredBusinesses() {
+    return businessService.getSubscriptionExpiredBusinesses();
+}
 }
