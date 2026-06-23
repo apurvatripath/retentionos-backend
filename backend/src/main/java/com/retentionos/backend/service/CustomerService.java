@@ -7,6 +7,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.retentionos.backend.entity.Customer;
+import com.retentionos.backend.exception.ResourceNotFoundException;
 import com.retentionos.backend.repository.CustomerRepository;
 import com.retentionos.backend.dto.RetentionMessageResponse;
 import com.retentionos.backend.entity.Business;
@@ -25,14 +26,14 @@ public class CustomerService {
 
     public Customer createCustomer(long businessId, Customer customer) {
         Business business = businessRepository.findById(businessId)
-                .orElseThrow(() -> new RuntimeException("Business not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Business not found"));
         customer.setBusiness(business);
         customer.setCreatedAt(LocalDateTime.now());
         return customerRepository.save(customer);
     }
     public List<Customer> getInactiveCustomers(Long businessId) {
     Business business = businessRepository.findById(businessId)
-            .orElseThrow(() -> new RuntimeException("Business not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Business not found"));
 
     int inactiveDays = switch (business.getBusinessType()) {
         case RESTAURANT -> 10;
@@ -76,6 +77,16 @@ public DashboardResponse getDashboard(Long businessId) {
             totalCustomers,
             activeCustomers,
             inactiveCustomers
+    );
+}
+public List<Customer> getExpiringMemberships(Long businessId) {
+    LocalDate today = LocalDate.now();
+    LocalDate nextSevenDays = today.plusDays(7);
+
+    return customerRepository.findByBusinessIdAndMembershipExpiryDateBetween(
+            businessId,
+            today,
+            nextSevenDays
     );
 }
 

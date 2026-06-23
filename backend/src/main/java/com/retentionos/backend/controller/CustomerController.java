@@ -44,5 +44,9 @@ public List<RetentionMessageResponse> getRetentionMessages(@PathVariable Long bu
 public DashboardResponse getDashboard(@PathVariable Long businessId) {
     return customerService.getDashboard(businessId);
 }
+@GetMapping("/{businessId}/customers/expiring-memberships")
+public List<Customer> getExpiringMemberships(@PathVariable Long businessId) {
+    return customerService.getExpiringMemberships(businessId);
+}
 
 }
