@@ -101,3 +101,21 @@ Swagger UI is available at:
 
 ```txt
 http://localhost:8080/swagger-ui/index.html
+
+## Screenshots
+
+### Swagger UI
+
+![Swagger UI](screenshots/swagger-ui.png)
+
+### Dashboard API
+
+![Dashboard API](screenshots/dashboard-api.png)
+
+### Inactive Customers
+
+![Inactive Customers](screenshots/inactive-customers.png)
+
+### Retention Messages
+
+![Retention Messages](screenshots/retention-messages.png)
