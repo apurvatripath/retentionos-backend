@@ -26,6 +26,8 @@ public class Customer {
 
     private LocalDate lastVisitDate;
 
+    private LocalDate lastPurchaseDate;
+
     private LocalDate membershipExpiryDate;
 
     private String status;

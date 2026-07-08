@@ -3,7 +3,10 @@ package com.retentionos.backend.controller;
 import java.util.List;
 
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import com.retentionos.backend.dto.CsvImportResponse;
+import com.retentionos.backend.dto.CustomerSignupRequest;
 import com.retentionos.backend.dto.DashboardResponse;
 import com.retentionos.backend.dto.RetentionMessageResponse;
 import com.retentionos.backend.entity.Customer;
@@ -48,5 +51,21 @@ public DashboardResponse getDashboard(@PathVariable Long businessId) {
 public List<Customer> getExpiringMemberships(@PathVariable Long businessId) {
     return customerService.getExpiringMemberships(businessId);
 }
+
+    @PostMapping("/{businessId}/customers/import")
+    public CsvImportResponse importCustomers(
+            @PathVariable Long businessId,
+            @RequestParam("file") MultipartFile file
+    ) {
+        return customerService.importCustomers(businessId, file);
+    }
+
+    @PostMapping("/{businessId}/customers/signup")
+    public Customer signupCustomer(
+            @PathVariable Long businessId,
+            @RequestBody CustomerSignupRequest request
+    ) {
+        return customerService.signupCustomer(businessId, request.name(), request.phone());
+    }
 
 }

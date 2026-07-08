@@ -11,6 +11,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     List<Customer> findByBusinessId(Long businessId);
 
     List<Customer> findByBusinessIdAndLastVisitDateBefore(Long businessId, LocalDate cutoffDate);
+    List<Customer> findByBusinessIdAndLastPurchaseDateBefore(Long businessId, LocalDate cutoffDate);
     List<Customer> findByBusinessIdAndMembershipExpiryDateBetween(
         Long businessId,
         LocalDate startDate,

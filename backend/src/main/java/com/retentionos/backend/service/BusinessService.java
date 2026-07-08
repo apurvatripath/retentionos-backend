@@ -40,7 +40,7 @@ public List<Business> getSubscriptionExpiredBusinesses() {
     LocalDateTime now = LocalDateTime.now();
 
     return businessRepository.findBySubscriptionStatusAndTrialEndDateBefore(
-            SubscriptionStatus.TRIAL,
+            SubscriptionStatus.ACTIVE,
             now
     );
 }
