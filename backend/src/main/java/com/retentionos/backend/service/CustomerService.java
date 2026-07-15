@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,6 +37,7 @@ public class CustomerService {
 
     private final CustomerRepository customerRepository;
     private final BusinessRepository businessRepository;
+    private final AiMessageService aiMessageService;
 
     public Customer createCustomer(long businessId, Customer customer) {
         Business business = businessRepository.findById(businessId)
@@ -78,12 +80,40 @@ public class CustomerService {
             .map(customer -> new RetentionMessageResponse(
                     customer.getName(),
                     customer.getPhone(),
-                    "Hi " + customer.getName()
-                            + ", we haven't seen you at "
-                            + customer.getBusiness().getName()
-                            + " for a while. Visit us again soon!"
+                    buildRetentionMessage(customer)
             ))
             .toList();
+}
+
+private String buildRetentionMessage(Customer customer) {
+    Business business = customer.getBusiness();
+
+    String aiMessage = aiMessageService.generateRetentionMessage(
+            customer.getName(),
+            business.getName(),
+            business.getBusinessType(),
+            resolveDaysInactive(customer, business.getBusinessType())
+    );
+
+    if (aiMessage != null) {
+        return aiMessage;
+    }
+
+    return "Hi " + customer.getName()
+            + ", we haven't seen you at "
+            + business.getName()
+            + " for a while. Visit us again soon!";
+}
+
+private long resolveDaysInactive(Customer customer, BusinessType businessType) {
+    LocalDate lastActivityDate = (businessType == BusinessType.RETAIL)
+            ? customer.getLastPurchaseDate()
+            : customer.getLastVisitDate();
+
+    if (lastActivityDate == null) {
+        return 0;
+    }
+    return ChronoUnit.DAYS.between(lastActivityDate, LocalDate.now());
 }
 public DashboardResponse getDashboard(Long businessId) {
     long totalCustomers = customerRepository.findByBusinessId(businessId).size();
