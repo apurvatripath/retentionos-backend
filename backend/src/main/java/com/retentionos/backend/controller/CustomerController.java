@@ -9,6 +9,7 @@ import com.retentionos.backend.dto.CsvImportResponse;
 import com.retentionos.backend.dto.CustomerSignupRequest;
 import com.retentionos.backend.dto.DashboardResponse;
 import com.retentionos.backend.dto.RetentionMessageResponse;
+import com.retentionos.backend.dto.SendRetentionMessageResponse;
 import com.retentionos.backend.entity.Customer;
 import com.retentionos.backend.service.CustomerService;
 
@@ -66,6 +67,14 @@ public List<Customer> getExpiringMemberships(@PathVariable Long businessId) {
             @RequestBody CustomerSignupRequest request
     ) {
         return customerService.signupCustomer(businessId, request.name(), request.phone());
+    }
+
+    @PostMapping("/{businessId}/customers/{customerId}/send-retention-message")
+    public SendRetentionMessageResponse sendRetentionMessage(
+            @PathVariable Long businessId,
+            @PathVariable Long customerId
+    ) {
+        return customerService.sendRetentionMessage(businessId, customerId);
     }
 
 }

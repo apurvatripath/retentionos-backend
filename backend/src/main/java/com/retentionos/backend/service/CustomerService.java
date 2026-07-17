@@ -24,6 +24,7 @@ import com.retentionos.backend.exception.ResourceNotFoundException;
 import com.retentionos.backend.repository.CustomerRepository;
 import com.retentionos.backend.dto.CsvImportResponse;
 import com.retentionos.backend.dto.RetentionMessageResponse;
+import com.retentionos.backend.dto.SendRetentionMessageResponse;
 import com.retentionos.backend.entity.Business;
 import com.retentionos.backend.repository.BusinessRepository;
 import com.retentionos.backend.dto.DashboardResponse;
@@ -38,6 +39,7 @@ public class CustomerService {
     private final CustomerRepository customerRepository;
     private final BusinessRepository businessRepository;
     private final AiMessageService aiMessageService;
+    private final WhatsAppService whatsAppService;
 
     public Customer createCustomer(long businessId, Customer customer) {
         Business business = businessRepository.findById(businessId)
@@ -103,6 +105,16 @@ private String buildRetentionMessage(Customer customer) {
             + ", we haven't seen you at "
             + business.getName()
             + " for a while. Visit us again soon!";
+}
+
+public SendRetentionMessageResponse sendRetentionMessage(Long businessId, Long customerId) {
+    Customer customer = customerRepository.findByIdAndBusinessId(customerId, businessId)
+            .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
+
+    String message = buildRetentionMessage(customer);
+    boolean sent = whatsAppService.sendTextMessage(customer.getPhone(), message);
+
+    return new SendRetentionMessageResponse(sent, message);
 }
 
 private long resolveDaysInactive(Customer customer, BusinessType businessType) {

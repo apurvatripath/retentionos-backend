@@ -6,10 +6,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.retentionos.backend.entity.BusinessType;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class AiMessageService {
 
@@ -33,7 +37,7 @@ public class AiMessageService {
 
         try {
             GeminiResponse response = webClient.post()
-                    .uri("/v1beta/models/gemini-2.5-flash:generateContent")
+                    .uri("/v1beta/models/gemini-flash-latest:generateContent")
                     .header("x-goog-api-key", apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(requestBody)
@@ -43,7 +47,11 @@ public class AiMessageService {
 
             String text = extractText(response);
             return (text == null || text.isBlank()) ? null : text.trim();
+        } catch (WebClientResponseException e) {
+            log.error("Gemini API call failed with status {}: {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
+            return null;
         } catch (Exception e) {
+            log.error("Gemini API call failed", e);
             return null;
         }
     }
