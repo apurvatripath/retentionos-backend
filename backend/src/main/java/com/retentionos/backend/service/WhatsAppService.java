@@ -9,6 +9,7 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
@@ -41,16 +42,19 @@ public class WhatsAppService {
             formData.add("channel", "whatsapp");
             formData.add("source", senderNumber);
             formData.add("destination", destinationNumber);
+            formData.add("src.name", "retentionos");
             formData.add("message", messagePayload);
 
-            webClient.post()
+            GupshupResponse response = webClient.post()
                     .uri("/wa/api/v1/msg")
                     .header("apikey", apiKey)
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .body(BodyInserters.fromFormData(formData))
                     .retrieve()
-                    .toBodilessEntity()
+                    .bodyToMono(GupshupResponse.class)
                     .block();
+
+            log.info("Gupshup message sent, messageId={}", response != null ? response.messageId() : null);
 
             return true;
         } catch (WebClientResponseException e) {
@@ -63,5 +67,9 @@ public class WhatsAppService {
     }
 
     private record TextMessage(String type, String text) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record GupshupResponse(String status, String messageId) {
     }
 }
