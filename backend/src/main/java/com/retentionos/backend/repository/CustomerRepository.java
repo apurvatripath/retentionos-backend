@@ -15,6 +15,8 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     Optional<Customer> findByPhoneAndBusinessId(String phone, Long businessId);
 
+    long countByBusinessIdAndCheckInCountGreaterThan(Long businessId, int checkInCount);
+
     List<Customer> findByBusinessIdAndLastVisitDateBefore(Long businessId, LocalDate cutoffDate);
     List<Customer> findByBusinessIdAndLastPurchaseDateBefore(Long businessId, LocalDate cutoffDate);
     List<Customer> findByBusinessIdAndMembershipExpiryDateBetween(

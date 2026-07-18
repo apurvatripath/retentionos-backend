@@ -1,5 +1,6 @@
 package com.retentionos.backend.controller;
 
+import com.retentionos.backend.dto.SetPasswordRequest;
 import com.retentionos.backend.entity.Business;
 import com.retentionos.backend.service.BusinessService;
 import lombok.RequiredArgsConstructor;
@@ -31,4 +32,9 @@ public List<Business> getTrialExpiringBusinesses() {
 public List<Business> getSubscriptionExpiredBusinesses() {
     return businessService.getSubscriptionExpiredBusinesses();
 }
+
+    @PostMapping("/{id}/set-password")
+    public Business setPassword(@PathVariable Long id, @RequestBody SetPasswordRequest request) {
+        return businessService.setPassword(id, request.password());
+    }
 }

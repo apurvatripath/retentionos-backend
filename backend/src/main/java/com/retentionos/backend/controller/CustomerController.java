@@ -9,9 +9,11 @@ import com.retentionos.backend.dto.CsvImportResponse;
 import com.retentionos.backend.dto.CustomerSignupRequest;
 import com.retentionos.backend.dto.CustomerSignupResponse;
 import com.retentionos.backend.dto.DashboardResponse;
+import com.retentionos.backend.dto.DashboardStatsResponse;
 import com.retentionos.backend.dto.RetentionMessageResponse;
 import com.retentionos.backend.dto.SendRetentionMessageResponse;
 import com.retentionos.backend.entity.Customer;
+import com.retentionos.backend.service.BusinessService;
 import com.retentionos.backend.service.CustomerService;
 
 
@@ -24,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 public class CustomerController {
 
     private final CustomerService customerService;
+    private final BusinessService businessService;
 
   @PostMapping("/{businessId}/customers")
 public Customer createCustomer(
@@ -76,6 +79,15 @@ public List<Customer> getExpiringMemberships(@PathVariable Long businessId) {
             @PathVariable Long customerId
     ) {
         return customerService.sendRetentionMessage(businessId, customerId);
+    }
+
+    @GetMapping("/{businessId}/dashboard-stats")
+    public DashboardStatsResponse getDashboardStats(
+            @PathVariable Long businessId,
+            @RequestHeader(value = "X-Auth-Token", required = false) String token
+    ) {
+        businessService.requireValidToken(businessId, token);
+        return customerService.getDashboardStats(businessId);
     }
 
 }

@@ -24,6 +24,7 @@ import com.retentionos.backend.exception.ResourceNotFoundException;
 import com.retentionos.backend.repository.CustomerRepository;
 import com.retentionos.backend.dto.CsvImportResponse;
 import com.retentionos.backend.dto.CustomerSignupResponse;
+import com.retentionos.backend.dto.DashboardStatsResponse;
 import com.retentionos.backend.dto.RetentionMessageResponse;
 import com.retentionos.backend.dto.SendRetentionMessageResponse;
 import com.retentionos.backend.entity.Business;
@@ -114,6 +115,12 @@ public SendRetentionMessageResponse sendRetentionMessage(Long businessId, Long c
 
     String message = buildRetentionMessage(customer);
     boolean sent = whatsAppService.sendTextMessage(customer.getPhone(), message);
+
+    if (sent) {
+        Business business = customer.getBusiness();
+        business.setMessagesSent((business.getMessagesSent() == null ? 0 : business.getMessagesSent()) + 1);
+        businessRepository.save(business);
+    }
 
     return new SendRetentionMessageResponse(sent, message);
 }
@@ -229,6 +236,7 @@ public List<Customer> getExpiringMemberships(Long businessId) {
         return customerRepository.findByPhoneAndBusinessId(phone, businessId)
                 .map(customer -> {
                     applyTodayActivityDate(customer, business.getBusinessType());
+                    customer.setCheckInCount((customer.getCheckInCount() == null ? 0 : customer.getCheckInCount()) + 1);
                     return new CustomerSignupResponse(customerRepository.save(customer), true);
                 })
                 .orElseGet(() -> {
@@ -241,6 +249,18 @@ public List<Customer> getExpiringMemberships(Long businessId) {
                     customer.setCreatedAt(LocalDateTime.now());
                     return new CustomerSignupResponse(customerRepository.save(customer), false);
                 });
+    }
+
+    public DashboardStatsResponse getDashboardStats(Long businessId) {
+        Business business = businessRepository.findById(businessId)
+                .orElseThrow(() -> new ResourceNotFoundException("Business not found"));
+
+        long totalCustomers = customerRepository.findByBusinessId(businessId).size();
+        long inactiveCustomers = getInactiveCustomers(businessId).size();
+        int messagesSent = business.getMessagesSent() == null ? 0 : business.getMessagesSent();
+        long returningCustomers = customerRepository.countByBusinessIdAndCheckInCountGreaterThan(businessId, 0);
+
+        return new DashboardStatsResponse(totalCustomers, inactiveCustomers, messagesSent, returningCustomers);
     }
 
     private void applyTodayActivityDate(Customer customer, BusinessType businessType) {

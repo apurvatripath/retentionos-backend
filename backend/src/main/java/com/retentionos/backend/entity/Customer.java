@@ -30,6 +30,8 @@ public class Customer {
 
     private LocalDate membershipExpiryDate;
 
+    private Integer checkInCount;
+
     private String status;
 
     private String notes;

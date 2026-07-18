@@ -16,4 +16,22 @@ public class GlobalExceptionHandler {
                 LocalDateTime.now()
         );
     }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ApiError handleUnauthorized(UnauthorizedException ex) {
+        return new ApiError(
+                ex.getMessage(),
+                LocalDateTime.now()
+        );
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ApiError handleIllegalState(IllegalStateException ex) {
+        return new ApiError(
+                ex.getMessage(),
+                LocalDateTime.now()
+        );
+    }
 }

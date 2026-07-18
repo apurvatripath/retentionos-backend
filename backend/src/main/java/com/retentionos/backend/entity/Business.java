@@ -40,4 +40,12 @@ public class Business {
     @OneToMany(mappedBy = "business")
     @JsonIgnore
     private List<Customer> customers;
+
+    @JsonIgnore
+    private String password;
+
+    @JsonIgnore
+    private String authToken;
+
+    private Integer messagesSent;
 }
