@@ -7,6 +7,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.retentionos.backend.dto.CsvImportResponse;
 import com.retentionos.backend.dto.CustomerSignupRequest;
+import com.retentionos.backend.dto.CustomerSignupResponse;
 import com.retentionos.backend.dto.DashboardResponse;
 import com.retentionos.backend.dto.RetentionMessageResponse;
 import com.retentionos.backend.dto.SendRetentionMessageResponse;
@@ -62,7 +63,7 @@ public List<Customer> getExpiringMemberships(@PathVariable Long businessId) {
     }
 
     @PostMapping("/{businessId}/customers/signup")
-    public Customer signupCustomer(
+    public CustomerSignupResponse signupCustomer(
             @PathVariable Long businessId,
             @RequestBody CustomerSignupRequest request
     ) {

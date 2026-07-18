@@ -208,11 +208,13 @@
                     if (!res.ok) throw new Error("Signup failed");
                     return res.json();
                 })
-                .then(function () {
+                .then(function (data) {
                     form.reset();
                     form.style.display = "none";
                     message.className = "message success";
-                    message.textContent = "Thanks, " + name + "! You're on the list.";
+                    message.textContent = data.checkIn
+                        ? "Welcome back, " + name + "!"
+                        : "You're all set, " + name + "!";
                 })
                 .catch(function () {
                     message.className = "message error";

@@ -13,6 +13,8 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     Optional<Customer> findByIdAndBusinessId(Long id, Long businessId);
 
+    Optional<Customer> findByPhoneAndBusinessId(String phone, Long businessId);
+
     List<Customer> findByBusinessIdAndLastVisitDateBefore(Long businessId, LocalDate cutoffDate);
     List<Customer> findByBusinessIdAndLastPurchaseDateBefore(Long businessId, LocalDate cutoffDate);
     List<Customer> findByBusinessIdAndMembershipExpiryDateBetween(

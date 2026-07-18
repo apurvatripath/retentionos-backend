@@ -23,6 +23,7 @@ import com.retentionos.backend.entity.Customer;
 import com.retentionos.backend.exception.ResourceNotFoundException;
 import com.retentionos.backend.repository.CustomerRepository;
 import com.retentionos.backend.dto.CsvImportResponse;
+import com.retentionos.backend.dto.CustomerSignupResponse;
 import com.retentionos.backend.dto.RetentionMessageResponse;
 import com.retentionos.backend.dto.SendRetentionMessageResponse;
 import com.retentionos.backend.entity.Business;
@@ -221,12 +222,34 @@ public List<Customer> getExpiringMemberships(Long businessId) {
         }
     }
 
-    public Customer signupCustomer(Long businessId, String name, String phone) {
-        Customer customer = new Customer();
-        customer.setName(name);
-        customer.setPhone(phone);
-        customer.setJoinDate(LocalDate.now());
-        return createCustomer(businessId, customer);
+    public CustomerSignupResponse signupCustomer(Long businessId, String name, String phone) {
+        Business business = businessRepository.findById(businessId)
+                .orElseThrow(() -> new ResourceNotFoundException("Business not found"));
+
+        return customerRepository.findByPhoneAndBusinessId(phone, businessId)
+                .map(customer -> {
+                    applyTodayActivityDate(customer, business.getBusinessType());
+                    return new CustomerSignupResponse(customerRepository.save(customer), true);
+                })
+                .orElseGet(() -> {
+                    Customer customer = new Customer();
+                    customer.setName(name);
+                    customer.setPhone(phone);
+                    customer.setJoinDate(LocalDate.now());
+                    applyTodayActivityDate(customer, business.getBusinessType());
+                    customer.setBusiness(business);
+                    customer.setCreatedAt(LocalDateTime.now());
+                    return new CustomerSignupResponse(customerRepository.save(customer), false);
+                });
+    }
+
+    private void applyTodayActivityDate(Customer customer, BusinessType businessType) {
+        LocalDate today = LocalDate.now();
+        if (businessType == BusinessType.RETAIL) {
+            customer.setLastPurchaseDate(today);
+        } else {
+            customer.setLastVisitDate(today);
+        }
     }
 
 }
