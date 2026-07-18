@@ -131,6 +131,23 @@
     .inactive-row .name { font-weight: 600; }
     .inactive-row .phone { color: var(--muted); }
     .empty-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
+
+    .batch-result {
+        margin-top: 16px;
+        padding: 14px;
+        border-radius: 10px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        font-size: 14px;
+        display: none;
+    }
+    .batch-result.visible { display: block; }
+    .batch-result .summary { font-weight: 600; margin-bottom: 6px; }
+    .batch-result .failure-row {
+        color: #b3261e;
+        font-size: 13px;
+        padding: 4px 0;
+    }
 </style>
 </head>
 <body>
@@ -228,6 +245,8 @@
             '</div>' +
             '<button id="viewInactiveBtn" class="secondary">View inactive customers</button>' +
             '<div class="inactive-list" id="inactiveList"></div>' +
+            '<button id="sendBatchBtn">Send retention messages to all inactive customers</button>' +
+            '<div class="batch-result" id="batchResult"></div>' +
             '<button id="logoutBtn" class="secondary">Log out</button>' +
             '<div class="message error" id="message"></div>';
 
@@ -238,6 +257,10 @@
 
         document.getElementById("viewInactiveBtn").addEventListener("click", function () {
             loadInactiveCustomers(session);
+        });
+
+        document.getElementById("sendBatchBtn").addEventListener("click", function () {
+            sendRetentionMessagesBatch(session);
         });
 
         loadStats(session);
@@ -266,6 +289,48 @@
                     document.getElementById("message").style.display = "block";
                     document.getElementById("message").textContent = "Could not load stats.";
                 }
+            });
+    }
+
+    function sendRetentionMessagesBatch(session) {
+        var btn = document.getElementById("sendBatchBtn");
+        var result = document.getElementById("batchResult");
+        btn.disabled = true;
+        btn.textContent = "Sending...";
+
+        fetch("/businesses/" + encodeURIComponent(session.businessId) + "/send-retention-messages-batch", {
+            method: "POST",
+            headers: { "X-Auth-Token": session.token }
+        })
+            .then(function (res) {
+                if (res.status === 401) throw new Error("unauthorized");
+                if (!res.ok) throw new Error("Failed to send messages");
+                return res.json();
+            })
+            .then(function (data) {
+                var html = '<div class="summary">' + data.sent + ' of ' + data.totalInactive +
+                    ' inactive customers messaged (' + data.failed + ' failed).</div>';
+                if (data.failures && data.failures.length > 0) {
+                    html += data.failures.map(function (f) {
+                        return '<div class="failure-row">' + f + '</div>';
+                    }).join("");
+                }
+                result.innerHTML = html;
+                result.className = "batch-result visible";
+                loadStats(session);
+            })
+            .catch(function (err) {
+                if (err.message === "unauthorized") {
+                    clearSession();
+                    renderLogin("Your session expired. Please log in again.");
+                } else {
+                    result.innerHTML = '<div class="summary">Could not send messages. Please try again.</div>';
+                    result.className = "batch-result visible";
+                }
+            })
+            .finally(function () {
+                btn.disabled = false;
+                btn.textContent = "Send retention messages to all inactive customers";
             });
     }
 

@@ -22,6 +22,7 @@ import com.retentionos.backend.entity.BusinessType;
 import com.retentionos.backend.entity.Customer;
 import com.retentionos.backend.exception.ResourceNotFoundException;
 import com.retentionos.backend.repository.CustomerRepository;
+import com.retentionos.backend.dto.BatchSendResponse;
 import com.retentionos.backend.dto.CsvImportResponse;
 import com.retentionos.backend.dto.CustomerSignupResponse;
 import com.retentionos.backend.dto.DashboardStatsResponse;
@@ -123,6 +124,24 @@ public SendRetentionMessageResponse sendRetentionMessage(Long businessId, Long c
     }
 
     return new SendRetentionMessageResponse(sent, message);
+}
+
+public BatchSendResponse sendRetentionMessagesBatch(Long businessId) {
+    List<Customer> inactiveCustomers = getInactiveCustomers(businessId);
+
+    int sent = 0;
+    List<String> failures = new ArrayList<>();
+
+    for (Customer customer : inactiveCustomers) {
+        SendRetentionMessageResponse result = sendRetentionMessage(businessId, customer.getId());
+        if (result.success()) {
+            sent++;
+        } else {
+            failures.add(customer.getName() + " (" + customer.getPhone() + "): WhatsApp send failed");
+        }
+    }
+
+    return new BatchSendResponse(inactiveCustomers.size(), sent, failures.size(), failures);
 }
 
 private long resolveDaysInactive(Customer customer, BusinessType businessType) {

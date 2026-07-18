@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.retentionos.backend.dto.BatchSendResponse;
 import com.retentionos.backend.dto.CsvImportResponse;
 import com.retentionos.backend.dto.CustomerSignupRequest;
 import com.retentionos.backend.dto.CustomerSignupResponse;
@@ -88,6 +89,15 @@ public List<Customer> getExpiringMemberships(@PathVariable Long businessId) {
     ) {
         businessService.requireValidToken(businessId, token);
         return customerService.getDashboardStats(businessId);
+    }
+
+    @PostMapping("/{businessId}/send-retention-messages-batch")
+    public BatchSendResponse sendRetentionMessagesBatch(
+            @PathVariable Long businessId,
+            @RequestHeader(value = "X-Auth-Token", required = false) String token
+    ) {
+        businessService.requireValidToken(businessId, token);
+        return customerService.sendRetentionMessagesBatch(businessId);
     }
 
 }
