@@ -103,6 +103,8 @@
         padding: 18px 14px;
         text-align: center;
     }
+    .stat-card.clickable { cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+    .stat-card.clickable:hover { background: #eef5f1; border-color: var(--brand); }
     .stat-value {
         font-size: 30px;
         font-weight: 700;
@@ -115,11 +117,16 @@
         color: var(--muted);
     }
 
-    .inactive-list {
+    .customer-list {
         margin-top: 16px;
         display: none;
     }
-    .inactive-list.visible { display: block; }
+    .customer-list.visible { display: block; }
+    .list-heading {
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 8px;
+    }
     .inactive-row {
         display: flex;
         justify-content: space-between;
@@ -238,13 +245,12 @@
             '<h1>' + session.businessName + '</h1>' +
             '<p class="subtitle">Here is how things are looking today.</p>' +
             '<div class="stats-grid">' +
-            '<div class="stat-card"><div class="stat-value" id="statTotal">-</div><div class="stat-label">Total Customers</div></div>' +
-            '<div class="stat-card"><div class="stat-value" id="statInactive">-</div><div class="stat-label">Inactive Customers</div></div>' +
+            '<div class="stat-card clickable" id="statTotalCard"><div class="stat-value" id="statTotal">-</div><div class="stat-label">Total Customers</div></div>' +
+            '<div class="stat-card clickable" id="statInactiveCard"><div class="stat-value" id="statInactive">-</div><div class="stat-label">Inactive Customers</div></div>' +
             '<div class="stat-card"><div class="stat-value" id="statSent">-</div><div class="stat-label">Messages Sent</div></div>' +
             '<div class="stat-card"><div class="stat-value" id="statReturning">-</div><div class="stat-label">Returning Customers</div></div>' +
             '</div>' +
-            '<button id="viewInactiveBtn" class="secondary">View inactive customers</button>' +
-            '<div class="inactive-list" id="inactiveList"></div>' +
+            '<div class="customer-list" id="customerList"></div>' +
             '<button id="sendBatchBtn">Send retention messages to all inactive customers</button>' +
             '<div class="batch-result" id="batchResult"></div>' +
             '<button id="logoutBtn" class="secondary">Log out</button>' +
@@ -255,8 +261,12 @@
             renderLogin();
         });
 
-        document.getElementById("viewInactiveBtn").addEventListener("click", function () {
-            loadInactiveCustomers(session);
+        document.getElementById("statTotalCard").addEventListener("click", function () {
+            loadCustomerList(session, "all");
+        });
+
+        document.getElementById("statInactiveCard").addEventListener("click", function () {
+            loadCustomerList(session, "inactive");
         });
 
         document.getElementById("sendBatchBtn").addEventListener("click", function () {
@@ -334,36 +344,31 @@
             });
     }
 
-    function loadInactiveCustomers(session) {
-        var list = document.getElementById("inactiveList");
-        var btn = document.getElementById("viewInactiveBtn");
-        btn.disabled = true;
-        btn.textContent = "Loading...";
+    function loadCustomerList(session, type) {
+        var list = document.getElementById("customerList");
+        var isInactive = type === "inactive";
+        var heading = isInactive ? "Inactive Customers" : "All Customers";
+        var url = "/businesses/" + encodeURIComponent(session.businessId) + "/customers" + (isInactive ? "/inactive" : "");
 
-        fetch("/businesses/" + encodeURIComponent(session.businessId) + "/customers/inactive")
+        list.className = "customer-list visible";
+        list.innerHTML = '<div class="list-heading">' + heading + '</div><div class="empty-note">Loading...</div>';
+
+        fetch(url)
             .then(function (res) {
-                if (!res.ok) throw new Error("Failed to load inactive customers");
+                if (!res.ok) throw new Error("Failed to load customers");
                 return res.json();
             })
             .then(function (customers) {
-                if (customers.length === 0) {
-                    list.innerHTML = '<div class="empty-note">No inactive customers right now.</div>';
-                } else {
-                    list.innerHTML = customers.map(function (c) {
+                var rows = customers.length === 0
+                    ? '<div class="empty-note">No customers found.</div>'
+                    : customers.map(function (c) {
                         return '<div class="inactive-row"><span class="name">' + c.name +
                             '</span><span class="phone">' + c.phone + '</span></div>';
                     }).join("");
-                }
-                list.className = "inactive-list visible";
-                btn.style.display = "none";
+                list.innerHTML = '<div class="list-heading">' + heading + ' (' + customers.length + ')</div>' + rows;
             })
             .catch(function () {
-                list.innerHTML = '<div class="empty-note">Could not load inactive customers.</div>';
-                list.className = "inactive-list visible";
-            })
-            .finally(function () {
-                btn.disabled = false;
-                btn.textContent = "View inactive customers";
+                list.innerHTML = '<div class="list-heading">' + heading + '</div><div class="empty-note">Could not load customers.</div>';
             });
     }
 })();
