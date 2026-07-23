@@ -2,6 +2,7 @@ package com.retentionos.backend.controller;
 
 import java.util.List;
 
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -11,6 +12,7 @@ import com.retentionos.backend.dto.CustomerSignupRequest;
 import com.retentionos.backend.dto.CustomerSignupResponse;
 import com.retentionos.backend.dto.DashboardResponse;
 import com.retentionos.backend.dto.DashboardStatsResponse;
+import com.retentionos.backend.dto.GenerateBillRequest;
 import com.retentionos.backend.dto.RetentionMessageResponse;
 import com.retentionos.backend.dto.SendRetentionMessageResponse;
 import com.retentionos.backend.entity.Customer;
@@ -98,6 +100,15 @@ public List<Customer> getExpiringMemberships(@PathVariable Long businessId) {
     ) {
         businessService.requireValidToken(businessId, token);
         return customerService.sendRetentionMessagesBatch(businessId);
+    }
+
+    @PostMapping(value = "/{businessId}/customers/{customerId}/generate-bill", produces = MediaType.TEXT_PLAIN_VALUE)
+    public String generateBill(
+            @PathVariable Long businessId,
+            @PathVariable Long customerId,
+            @RequestBody GenerateBillRequest request
+    ) {
+        return customerService.generateBill(businessId, customerId, request.items());
     }
 
 }

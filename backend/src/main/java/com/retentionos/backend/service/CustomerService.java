@@ -17,12 +17,14 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.retentionos.backend.entity.BusinessType;
 import com.retentionos.backend.entity.Customer;
 import com.retentionos.backend.exception.ResourceNotFoundException;
 import com.retentionos.backend.repository.CustomerRepository;
 import com.retentionos.backend.dto.BatchSendResponse;
+import com.retentionos.backend.dto.BillItemRequest;
 import com.retentionos.backend.dto.CsvImportResponse;
 import com.retentionos.backend.dto.CustomerSignupResponse;
 import com.retentionos.backend.dto.DashboardStatsResponse;
@@ -280,6 +282,47 @@ public List<Customer> getExpiringMemberships(Long businessId) {
         long returningCustomers = customerRepository.countByBusinessIdAndCheckInCountGreaterThan(businessId, 0);
 
         return new DashboardStatsResponse(totalCustomers, inactiveCustomers, messagesSent, returningCustomers);
+    }
+
+    public String generateBill(Long businessId, Long customerId, List<BillItemRequest> items) {
+        Customer customer = customerRepository.findByIdAndBusinessId(customerId, businessId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
+
+        if (items == null || items.isEmpty()) {
+            throw new IllegalArgumentException("At least one item is required");
+        }
+        for (BillItemRequest item : items) {
+            if (item.quantity() <= 0) {
+                throw new IllegalArgumentException("Quantity must be greater than 0 for item: " + item.name());
+            }
+        }
+
+        Business business = customer.getBusiness();
+        double total = 0;
+
+        StringBuilder bill = new StringBuilder();
+        bill.append(business.getName()).append("\n");
+        bill.append("Bill for: ").append(customer.getName()).append("\n");
+        bill.append("------------------------------\n");
+
+        for (BillItemRequest item : items) {
+            double lineTotal = item.price() * item.quantity();
+            total += lineTotal;
+            bill.append(String.format("%s x%d @ Rs.%.2f = Rs.%.2f%n", item.name(), item.quantity(), item.price(), lineTotal));
+        }
+
+        bill.append("------------------------------\n");
+        bill.append(String.format("Total: Rs.%.2f%n", total));
+        bill.append("\nThank you for visiting ").append(business.getName()).append("! We hope to see you again soon.\n");
+
+        String signupUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/signup.html")
+                .queryParam("businessId", businessId)
+                .build()
+                .toUriString();
+        bill.append("\nVisit us again: ").append(signupUrl);
+
+        return bill.toString();
     }
 
     private void applyTodayActivityDate(Customer customer, BusinessType businessType) {

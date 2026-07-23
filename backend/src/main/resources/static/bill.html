@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Generate Bill</title>
+<style>
+    :root {
+        --brand: #1f6f54;
+        --brand-dark: #144a38;
+        --ink: #1a1a1a;
+        --muted: #6b7280;
+        --border: #e2e2e2;
+        --bg: #fafaf7;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 24px;
+    }
+    .card {
+        width: 100%;
+        max-width: 480px;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 32px 28px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    h1 {
+        font-size: 22px;
+        margin: 0 0 6px;
+    }
+    p.subtitle {
+        color: var(--muted);
+        margin: 0 0 24px;
+        font-size: 14px;
+    }
+    label {
+        display: block;
+        text-align: left;
+        font-size: 13px;
+        font-weight: 600;
+        margin: 16px 0 6px;
+    }
+    input[type="text"],
+    input[type="tel"],
+    input[type="number"] {
+        width: 100%;
+        padding: 12px 14px;
+        font-size: 16px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        outline: none;
+    }
+    input:focus { border-color: var(--brand); }
+    button {
+        width: 100%;
+        margin-top: 24px;
+        padding: 14px;
+        font-size: 16px;
+        font-weight: 600;
+        color: #fff;
+        background: var(--brand);
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+    }
+    button:hover { background: var(--brand-dark); }
+    button:disabled { background: #a7a7a7; cursor: not-allowed; }
+    button.secondary {
+        background: #fff;
+        color: var(--brand-dark);
+        border: 1px solid var(--brand);
+    }
+    button.secondary:hover { background: #f0f7f4; }
+    button.btn-inline {
+        width: auto;
+        margin-top: 0;
+        padding: 12px 18px;
+        white-space: nowrap;
+    }
+    .message {
+        margin-top: 18px;
+        font-size: 14px;
+        display: none;
+        text-align: center;
+    }
+    .message.error { color: #b3261e; display: block; }
+
+    .phone-row {
+        display: flex;
+        gap: 8px;
+    }
+    .phone-row input { flex: 1; }
+
+    .empty-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
+    .empty-note.found { color: var(--brand-dark); font-weight: 600; }
+    .empty-note.not-found { color: #b3261e; }
+
+    .item-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 8px;
+        align-items: center;
+    }
+    .item-row input { margin: 0; padding: 10px 12px; font-size: 14px; }
+    .item-row .item-name { flex: 2; }
+    .item-row .item-qty { flex: 1; }
+    .item-row .item-price { flex: 1; }
+    .remove-item-btn {
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
+        padding: 0;
+        margin: 0;
+        font-size: 18px;
+        line-height: 1;
+        background: #fff;
+        color: #b3261e;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    .remove-item-btn:hover { background: #fdecea; }
+
+    .bill-preview {
+        margin-top: 16px;
+        padding: 14px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        white-space: pre-wrap;
+        display: none;
+    }
+    .wa-btn {
+        display: inline-block;
+        width: 100%;
+        margin-top: 12px;
+        padding: 14px;
+        font-size: 16px;
+        font-weight: 600;
+        color: #fff;
+        background: #25D366;
+        border-radius: 10px;
+        text-decoration: none;
+        text-align: center;
+    }
+    .wa-btn:hover { background: #1ebe57; }
+</style>
+</head>
+<body>
+<div class="card" id="card"></div>
+
+<script>
+(function () {
+    var card = document.getElementById("card");
+    var params = new URLSearchParams(window.location.search);
+    var businessId = params.get("businessId");
+
+    if (!businessId) {
+        card.innerHTML =
+            '<h1>Generate Bill</h1>' +
+            '<p class="subtitle">Missing businessId in the URL. Append ?businessId=1 (or your business ID) to this page\'s address.</p>';
+        return;
+    }
+
+    var items = [{ name: "", price: "", quantity: "1" }];
+    var selectedCustomer = null;
+
+    function escapeAttr(str) {
+        return String(str || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    }
+
+    function normalizePhone(phone) {
+        var digits = (phone || "").replace(/\D/g, "");
+        if (digits.length === 10) {
+            digits = "91" + digits;
+        }
+        return digits;
+    }
+
+    card.innerHTML =
+        '<h1>Generate Bill</h1>' +
+        '<p class="subtitle">Business ID: ' + businessId + '</p>' +
+        '<label for="customerPhone">Customer phone number</label>' +
+        '<div class="phone-row">' +
+        '<input type="tel" id="customerPhone" placeholder="e.g. 9876543210">' +
+        '<button type="button" id="findCustomerBtn" class="btn-inline">Find</button>' +
+        '</div>' +
+        '<div class="empty-note" id="customerResult"></div>' +
+        '<label>Items</label>' +
+        '<div id="itemRows"></div>' +
+        '<button type="button" id="addItemBtn" class="secondary">+ Add item</button>' +
+        '<button type="button" id="generateBtn" disabled>Generate &amp; Send Bill</button>' +
+        '<div class="message error" id="message"></div>' +
+        '<div class="bill-preview" id="billPreview"></div>' +
+        '<div id="waLinkContainer"></div>';
+
+    var customerPhoneInput = document.getElementById("customerPhone");
+    var customerResult = document.getElementById("customerResult");
+    var generateBtn = document.getElementById("generateBtn");
+    var message = document.getElementById("message");
+    var billPreview = document.getElementById("billPreview");
+    var waLinkContainer = document.getElementById("waLinkContainer");
+
+    function renderItemRows() {
+        var container = document.getElementById("itemRows");
+        container.innerHTML = items.map(function (item, i) {
+            return '<div class="item-row">' +
+                '<input type="text" class="item-name" data-index="' + i + '" placeholder="Item name" value="' + escapeAttr(item.name) + '">' +
+                '<input type="number" class="item-qty" data-index="' + i + '" placeholder="Qty" min="1" step="1" value="' + escapeAttr(item.quantity) + '">' +
+                '<input type="number" class="item-price" data-index="' + i + '" placeholder="Price" min="0" step="0.01" value="' + escapeAttr(item.price) + '">' +
+                (items.length > 1 ? '<button type="button" class="remove-item-btn" data-index="' + i + '">&times;</button>' : '') +
+                '</div>';
+        }).join("");
+
+        Array.prototype.forEach.call(container.querySelectorAll(".item-name"), function (input) {
+            input.addEventListener("input", function () {
+                items[Number(input.dataset.index)].name = input.value;
+            });
+        });
+        Array.prototype.forEach.call(container.querySelectorAll(".item-qty"), function (input) {
+            input.addEventListener("input", function () {
+                items[Number(input.dataset.index)].quantity = input.value;
+            });
+        });
+        Array.prototype.forEach.call(container.querySelectorAll(".item-price"), function (input) {
+            input.addEventListener("input", function () {
+                items[Number(input.dataset.index)].price = input.value;
+            });
+        });
+        Array.prototype.forEach.call(container.querySelectorAll(".remove-item-btn"), function (btn) {
+            btn.addEventListener("click", function () {
+                items.splice(Number(btn.dataset.index), 1);
+                renderItemRows();
+            });
+        });
+    }
+
+    renderItemRows();
+
+    document.getElementById("addItemBtn").addEventListener("click", function () {
+        items.push({ name: "", price: "", quantity: "1" });
+        renderItemRows();
+    });
+
+    document.getElementById("findCustomerBtn").addEventListener("click", function () {
+        var phone = customerPhoneInput.value.trim();
+        if (!phone) return;
+
+        selectedCustomer = null;
+        generateBtn.disabled = true;
+        customerResult.className = "empty-note";
+        customerResult.textContent = "Searching...";
+
+        fetch("/businesses/" + encodeURIComponent(businessId) + "/customers")
+            .then(function (res) {
+                if (!res.ok) throw new Error("Failed to load customers");
+                return res.json();
+            })
+            .then(function (customers) {
+                var match = customers.find(function (c) {
+                    return normalizePhone(c.phone) === normalizePhone(phone);
+                });
+                if (match) {
+                    selectedCustomer = match;
+                    customerResult.className = "empty-note found";
+                    customerResult.textContent = "Found: " + match.name + " (" + match.phone + ")";
+                    generateBtn.disabled = false;
+                } else {
+                    customerResult.className = "empty-note not-found";
+                    customerResult.textContent = "No customer found with that phone number.";
+                }
+            })
+            .catch(function () {
+                customerResult.className = "empty-note not-found";
+                customerResult.textContent = "Could not search customers. Please try again.";
+            });
+    });
+
+    generateBtn.addEventListener("click", function () {
+        message.style.display = "none";
+        billPreview.style.display = "none";
+        waLinkContainer.innerHTML = "";
+
+        if (!selectedCustomer) {
+            message.textContent = "Please find a customer first.";
+            message.style.display = "block";
+            return;
+        }
+
+        var validItems = items
+            .filter(function (item) {
+                return item.name.trim() !== "" && item.price !== "" && !isNaN(parseFloat(item.price)) &&
+                    item.quantity !== "" && !isNaN(parseInt(item.quantity, 10)) && parseInt(item.quantity, 10) > 0;
+            })
+            .map(function (item) {
+                return { name: item.name.trim(), price: parseFloat(item.price), quantity: parseInt(item.quantity, 10) };
+            });
+
+        if (validItems.length === 0) {
+            message.textContent = "Please add at least one item with a name, quantity, and price.";
+            message.style.display = "block";
+            return;
+        }
+
+        generateBtn.disabled = true;
+        generateBtn.textContent = "Generating...";
+
+        fetch("/businesses/" + encodeURIComponent(businessId) + "/customers/" + encodeURIComponent(selectedCustomer.id) + "/generate-bill", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items: validItems })
+        })
+            .then(function (res) {
+                if (!res.ok) throw new Error("Failed to generate bill");
+                return res.text();
+            })
+            .then(function (billText) {
+                billPreview.textContent = billText;
+                billPreview.style.display = "block";
+
+                var waLink = "https://wa.me/" + normalizePhone(selectedCustomer.phone) + "?text=" + encodeURIComponent(billText);
+                waLinkContainer.innerHTML = '<a class="wa-btn" href="' + waLink + '" target="_blank" rel="noopener noreferrer">Send via WhatsApp</a>';
+            })
+            .catch(function () {
+                message.textContent = "Could not generate bill. Please try again.";
+                message.style.display = "block";
+            })
+            .finally(function () {
+                generateBtn.disabled = false;
+                generateBtn.textContent = "Generate & Send Bill";
+            });
+    });
+})();
+</script>
+</body>
+</html>
