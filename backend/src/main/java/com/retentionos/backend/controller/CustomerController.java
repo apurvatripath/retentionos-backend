@@ -12,6 +12,7 @@ import com.retentionos.backend.dto.CustomerSignupRequest;
 import com.retentionos.backend.dto.CustomerSignupResponse;
 import com.retentionos.backend.dto.DashboardResponse;
 import com.retentionos.backend.dto.DashboardStatsResponse;
+import com.retentionos.backend.dto.GenerateBillPdfResponse;
 import com.retentionos.backend.dto.GenerateBillRequest;
 import com.retentionos.backend.dto.RetentionMessageResponse;
 import com.retentionos.backend.dto.SendRetentionMessageResponse;
@@ -109,6 +110,15 @@ public List<Customer> getExpiringMemberships(@PathVariable Long businessId) {
             @RequestBody GenerateBillRequest request
     ) {
         return customerService.generateBill(businessId, customerId, request.items());
+    }
+
+    @PostMapping("/{businessId}/customers/{customerId}/generate-bill-pdf")
+    public GenerateBillPdfResponse generateBillPdf(
+            @PathVariable Long businessId,
+            @PathVariable Long customerId,
+            @RequestBody GenerateBillRequest request
+    ) {
+        return customerService.generateBillPdf(businessId, customerId, request.items());
     }
 
 }

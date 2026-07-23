@@ -317,20 +317,21 @@
         generateBtn.disabled = true;
         generateBtn.textContent = "Generating...";
 
-        fetch("/businesses/" + encodeURIComponent(businessId) + "/customers/" + encodeURIComponent(selectedCustomer.id) + "/generate-bill", {
+        fetch("/businesses/" + encodeURIComponent(businessId) + "/customers/" + encodeURIComponent(selectedCustomer.id) + "/generate-bill-pdf", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ items: validItems })
         })
             .then(function (res) {
                 if (!res.ok) throw new Error("Failed to generate bill");
-                return res.text();
+                return res.json();
             })
-            .then(function (billText) {
-                billPreview.textContent = billText;
+            .then(function (data) {
+                billPreview.innerHTML = '<a href="' + data.pdfUrl + '" target="_blank" rel="noopener noreferrer">View bill PDF</a>';
                 billPreview.style.display = "block";
 
-                var waLink = "https://wa.me/" + normalizePhone(selectedCustomer.phone) + "?text=" + encodeURIComponent(billText);
+                var waMessage = "Your bill from " + data.businessName + " is ready: " + data.pdfUrl;
+                var waLink = "https://wa.me/" + normalizePhone(selectedCustomer.phone) + "?text=" + encodeURIComponent(waMessage);
                 waLinkContainer.innerHTML = '<a class="wa-btn" href="' + waLink + '" target="_blank" rel="noopener noreferrer">Send via WhatsApp</a>';
             })
             .catch(function () {

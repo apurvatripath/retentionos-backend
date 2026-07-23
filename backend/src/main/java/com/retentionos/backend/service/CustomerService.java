@@ -28,6 +28,7 @@ import com.retentionos.backend.dto.BillItemRequest;
 import com.retentionos.backend.dto.CsvImportResponse;
 import com.retentionos.backend.dto.CustomerSignupResponse;
 import com.retentionos.backend.dto.DashboardStatsResponse;
+import com.retentionos.backend.dto.GenerateBillPdfResponse;
 import com.retentionos.backend.dto.RetentionMessageResponse;
 import com.retentionos.backend.dto.SendRetentionMessageResponse;
 import com.retentionos.backend.entity.Business;
@@ -45,6 +46,7 @@ public class CustomerService {
     private final BusinessRepository businessRepository;
     private final AiMessageService aiMessageService;
     private final WhatsAppService whatsAppService;
+    private final BillPdfService billPdfService;
 
     public Customer createCustomer(long businessId, Customer customer) {
         Business business = businessRepository.findById(businessId)
@@ -287,15 +289,7 @@ public List<Customer> getExpiringMemberships(Long businessId) {
     public String generateBill(Long businessId, Long customerId, List<BillItemRequest> items) {
         Customer customer = customerRepository.findByIdAndBusinessId(customerId, businessId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
-
-        if (items == null || items.isEmpty()) {
-            throw new IllegalArgumentException("At least one item is required");
-        }
-        for (BillItemRequest item : items) {
-            if (item.quantity() <= 0) {
-                throw new IllegalArgumentException("Quantity must be greater than 0 for item: " + item.name());
-            }
-        }
+        validateBillItems(items);
 
         Business business = customer.getBusiness();
         double total = 0;
@@ -314,15 +308,41 @@ public List<Customer> getExpiringMemberships(Long businessId) {
         bill.append("------------------------------\n");
         bill.append(String.format("Total: Rs.%.2f%n", total));
         bill.append("\nThank you for visiting ").append(business.getName()).append("! We hope to see you again soon.\n");
+        bill.append("\nVisit us again: ").append(buildSignupUrl(businessId));
 
-        String signupUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
+        return bill.toString();
+    }
+
+    public GenerateBillPdfResponse generateBillPdf(Long businessId, Long customerId, List<BillItemRequest> items) {
+        Customer customer = customerRepository.findByIdAndBusinessId(customerId, businessId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
+        validateBillItems(items);
+
+        Business business = customer.getBusiness();
+        double total = items.stream().mapToDouble(item -> item.price() * item.quantity()).sum();
+        String signupUrl = buildSignupUrl(businessId);
+
+        String pdfUrl = billPdfService.generateBillPdf(business, customer, items, total, signupUrl);
+        return new GenerateBillPdfResponse(pdfUrl, business.getName());
+    }
+
+    private void validateBillItems(List<BillItemRequest> items) {
+        if (items == null || items.isEmpty()) {
+            throw new IllegalArgumentException("At least one item is required");
+        }
+        for (BillItemRequest item : items) {
+            if (item.quantity() <= 0) {
+                throw new IllegalArgumentException("Quantity must be greater than 0 for item: " + item.name());
+            }
+        }
+    }
+
+    private String buildSignupUrl(Long businessId) {
+        return ServletUriComponentsBuilder.fromCurrentContextPath()
                 .path("/signup.html")
                 .queryParam("businessId", businessId)
                 .build()
                 .toUriString();
-        bill.append("\nVisit us again: ").append(signupUrl);
-
-        return bill.toString();
     }
 
     private void applyTodayActivityDate(Customer customer, BusinessType businessType) {
