@@ -139,22 +139,32 @@
     .inactive-row .phone { color: var(--muted); }
     .empty-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
 
-    .batch-result {
-        margin-top: 16px;
-        padding: 14px;
-        border-radius: 10px;
-        background: var(--bg);
-        border: 1px solid var(--border);
+    .message-row {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border);
         font-size: 14px;
-        display: none;
     }
-    .batch-result.visible { display: block; }
-    .batch-result .summary { font-weight: 600; margin-bottom: 6px; }
-    .batch-result .failure-row {
-        color: #b3261e;
+    .message-row:last-child { border-bottom: none; }
+    .message-row .name { font-weight: 600; }
+    .message-row .phone { color: var(--muted); font-size: 13px; }
+    .message-row .draft {
+        margin-top: 6px;
         font-size: 13px;
-        padding: 4px 0;
+        color: var(--ink);
+        white-space: pre-wrap;
     }
+    .wa-btn {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 8px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #fff;
+        background: #25D366;
+        border-radius: 8px;
+        text-decoration: none;
+    }
+    .wa-btn:hover { background: #1ebe57; }
 </style>
 </head>
 <body>
@@ -251,8 +261,6 @@
             '<div class="stat-card"><div class="stat-value" id="statReturning">-</div><div class="stat-label">Returning Customers</div></div>' +
             '</div>' +
             '<div class="customer-list" id="customerList"></div>' +
-            '<button id="sendBatchBtn">Send retention messages to all inactive customers</button>' +
-            '<div class="batch-result" id="batchResult"></div>' +
             '<button id="logoutBtn" class="secondary">Log out</button>' +
             '<div class="message error" id="message"></div>';
 
@@ -267,10 +275,6 @@
 
         document.getElementById("statInactiveCard").addEventListener("click", function () {
             loadCustomerList(session, "inactive");
-        });
-
-        document.getElementById("sendBatchBtn").addEventListener("click", function () {
-            sendRetentionMessagesBatch(session);
         });
 
         loadStats(session);
@@ -302,53 +306,19 @@
             });
     }
 
-    function sendRetentionMessagesBatch(session) {
-        var btn = document.getElementById("sendBatchBtn");
-        var result = document.getElementById("batchResult");
-        btn.disabled = true;
-        btn.textContent = "Sending...";
-
-        fetch("/businesses/" + encodeURIComponent(session.businessId) + "/send-retention-messages-batch", {
-            method: "POST",
-            headers: { "X-Auth-Token": session.token }
-        })
-            .then(function (res) {
-                if (res.status === 401) throw new Error("unauthorized");
-                if (!res.ok) throw new Error("Failed to send messages");
-                return res.json();
-            })
-            .then(function (data) {
-                var html = '<div class="summary">' + data.sent + ' of ' + data.totalInactive +
-                    ' inactive customers messaged (' + data.failed + ' failed).</div>';
-                if (data.failures && data.failures.length > 0) {
-                    html += data.failures.map(function (f) {
-                        return '<div class="failure-row">' + f + '</div>';
-                    }).join("");
-                }
-                result.innerHTML = html;
-                result.className = "batch-result visible";
-                loadStats(session);
-            })
-            .catch(function (err) {
-                if (err.message === "unauthorized") {
-                    clearSession();
-                    renderLogin("Your session expired. Please log in again.");
-                } else {
-                    result.innerHTML = '<div class="summary">Could not send messages. Please try again.</div>';
-                    result.className = "batch-result visible";
-                }
-            })
-            .finally(function () {
-                btn.disabled = false;
-                btn.textContent = "Send retention messages to all inactive customers";
-            });
+    function normalizePhone(phone) {
+        var digits = (phone || "").replace(/\D/g, "");
+        if (digits.length === 10) {
+            digits = "91" + digits;
+        }
+        return digits;
     }
 
     function loadCustomerList(session, type) {
         var list = document.getElementById("customerList");
         var isInactive = type === "inactive";
         var heading = isInactive ? "Inactive Customers" : "All Customers";
-        var url = "/businesses/" + encodeURIComponent(session.businessId) + "/customers" + (isInactive ? "/inactive" : "");
+        var url = "/businesses/" + encodeURIComponent(session.businessId) + (isInactive ? "/messages" : "/customers");
 
         list.className = "customer-list visible";
         list.innerHTML = '<div class="list-heading">' + heading + '</div><div class="empty-note">Loading...</div>';
@@ -358,14 +328,27 @@
                 if (!res.ok) throw new Error("Failed to load customers");
                 return res.json();
             })
-            .then(function (customers) {
-                var rows = customers.length === 0
-                    ? '<div class="empty-note">No customers found.</div>'
-                    : customers.map(function (c) {
+            .then(function (items) {
+                var rows;
+                if (items.length === 0) {
+                    rows = '<div class="empty-note">No customers found.</div>';
+                } else if (isInactive) {
+                    rows = items.map(function (m) {
+                        var waLink = "https://wa.me/" + normalizePhone(m.phone) + "?text=" + encodeURIComponent(m.message);
+                        return '<div class="message-row">' +
+                            '<div class="name">' + m.customerName + '</div>' +
+                            '<div class="phone">' + m.phone + '</div>' +
+                            '<div class="draft">' + m.message + '</div>' +
+                            '<a class="wa-btn" href="' + waLink + '" target="_blank" rel="noopener noreferrer">Send via WhatsApp</a>' +
+                            '</div>';
+                    }).join("");
+                } else {
+                    rows = items.map(function (c) {
                         return '<div class="inactive-row"><span class="name">' + c.name +
                             '</span><span class="phone">' + c.phone + '</span></div>';
                     }).join("");
-                list.innerHTML = '<div class="list-heading">' + heading + ' (' + customers.length + ')</div>' + rows;
+                }
+                list.innerHTML = '<div class="list-heading">' + heading + ' (' + items.length + ')</div>' + rows;
             })
             .catch(function () {
                 list.innerHTML = '<div class="list-heading">' + heading + '</div><div class="empty-note">Could not load customers.</div>';
