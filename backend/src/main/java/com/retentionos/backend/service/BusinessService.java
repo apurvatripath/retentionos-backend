@@ -52,9 +52,13 @@ public List<Business> getSubscriptionExpiredBusinesses() {
     );
 }
 
-public Business setPassword(Long businessId, String rawPassword) {
+public Business setPassword(Long businessId, String phone, String rawPassword) {
     Business business = businessRepository.findById(businessId)
             .orElseThrow(() -> new ResourceNotFoundException("Business not found"));
+
+    if (phone == null || !phone.equals(business.getPhone())) {
+        throw new UnauthorizedException("Phone does not match business records");
+    }
 
     if (business.getPassword() != null) {
         throw new IllegalStateException("Password already set for this business");

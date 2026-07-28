@@ -35,6 +35,6 @@ public List<Business> getSubscriptionExpiredBusinesses() {
 
     @PostMapping("/{id}/set-password")
     public Business setPassword(@PathVariable Long id, @RequestBody SetPasswordRequest request) {
-        return businessService.setPassword(id, request.password());
+        return businessService.setPassword(id, request.phone(), request.password());
     }
 }
