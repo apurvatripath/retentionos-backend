@@ -29,6 +29,7 @@ public class Business {
     private BusinessType businessType;
 
     private String city;
+    private String businessState;
 
     private LocalDateTime trialStartDate;
     private LocalDateTime trialEndDate;

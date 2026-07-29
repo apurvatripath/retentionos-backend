@@ -109,7 +109,7 @@ public List<Customer> getExpiringMemberships(@PathVariable Long businessId) {
             @PathVariable Long customerId,
             @RequestBody GenerateBillRequest request
     ) {
-        return customerService.generateBill(businessId, customerId, request.items());
+        return customerService.generateBill(businessId, customerId, request.items(), request.customerState());
     }
 
     @PostMapping("/{businessId}/customers/{customerId}/generate-bill-pdf")
@@ -118,7 +118,7 @@ public List<Customer> getExpiringMemberships(@PathVariable Long businessId) {
             @PathVariable Long customerId,
             @RequestBody GenerateBillRequest request
     ) {
-        return customerService.generateBillPdf(businessId, customerId, request.items());
+        return customerService.generateBillPdf(businessId, customerId, request.items(), request.customerState());
     }
 
 }

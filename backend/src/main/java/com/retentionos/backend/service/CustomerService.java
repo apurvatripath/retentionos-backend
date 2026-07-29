@@ -3,6 +3,8 @@ package com.retentionos.backend.service;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -24,7 +26,9 @@ import com.retentionos.backend.entity.Customer;
 import com.retentionos.backend.exception.ResourceNotFoundException;
 import com.retentionos.backend.repository.CustomerRepository;
 import com.retentionos.backend.dto.BatchSendResponse;
+import com.retentionos.backend.dto.BillCalculation;
 import com.retentionos.backend.dto.BillItemRequest;
+import com.retentionos.backend.dto.BillLineCalculation;
 import com.retentionos.backend.dto.CsvImportResponse;
 import com.retentionos.backend.dto.CustomerSignupResponse;
 import com.retentionos.backend.dto.DashboardStatsResponse;
@@ -286,44 +290,116 @@ public List<Customer> getExpiringMemberships(Long businessId) {
         return new DashboardStatsResponse(totalCustomers, inactiveCustomers, messagesSent, returningCustomers);
     }
 
-    public String generateBill(Long businessId, Long customerId, List<BillItemRequest> items) {
+    public String generateBill(Long businessId, Long customerId, List<BillItemRequest> items, String customerState) {
         Customer customer = customerRepository.findByIdAndBusinessId(customerId, businessId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
         validateBillItems(items);
 
         Business business = customer.getBusiness();
-        double total = 0;
+        BillCalculation calc = calculateBill(business, customerState, items);
 
         StringBuilder bill = new StringBuilder();
         bill.append(business.getName()).append("\n");
         bill.append("Bill for: ").append(customer.getName()).append("\n");
         bill.append("------------------------------\n");
 
-        for (BillItemRequest item : items) {
-            double lineTotal = item.price() * item.quantity();
-            total += lineTotal;
-            bill.append(String.format("%s x%d @ Rs.%.2f = Rs.%.2f%n", item.name(), item.quantity(), item.price(), lineTotal));
+        for (BillLineCalculation line : calc.lines()) {
+            if (calc.hasTax()) {
+                bill.append(String.format("%s x%d @ Rs.%.2f = Rs.%.2f (GST %s%% = Rs.%.2f)%n",
+                        line.name(), line.quantity(), line.price(), line.lineSubtotal(),
+                        formatRate(line.gstRate()), line.taxAmount()));
+            } else {
+                bill.append(String.format("%s x%d @ Rs.%.2f = Rs.%.2f%n", line.name(), line.quantity(), line.price(), line.lineSubtotal()));
+            }
         }
 
         bill.append("------------------------------\n");
-        bill.append(String.format("Total: Rs.%.2f%n", total));
+
+        if (calc.hasTax()) {
+            bill.append(String.format("Subtotal: Rs.%.2f%n", calc.subtotal()));
+            if (calc.interState()) {
+                bill.append(String.format("IGST: Rs.%.2f%n", calc.totalIgst()));
+            } else {
+                bill.append(String.format("CGST: Rs.%.2f%n", calc.totalCgst()));
+                bill.append(String.format("SGST: Rs.%.2f%n", calc.totalSgst()));
+            }
+            bill.append(String.format("Grand Total: Rs.%.2f%n", calc.grandTotal()));
+        } else {
+            bill.append(String.format("Total: Rs.%.2f%n", calc.subtotal()));
+        }
+
         bill.append("\nThank you for visiting ").append(business.getName()).append("! We hope to see you again soon.\n");
         bill.append("\nVisit us again: ").append(buildSignupUrl(businessId));
 
         return bill.toString();
     }
 
-    public GenerateBillPdfResponse generateBillPdf(Long businessId, Long customerId, List<BillItemRequest> items) {
+    public GenerateBillPdfResponse generateBillPdf(Long businessId, Long customerId, List<BillItemRequest> items, String customerState) {
         Customer customer = customerRepository.findByIdAndBusinessId(customerId, businessId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
         validateBillItems(items);
 
         Business business = customer.getBusiness();
-        double total = items.stream().mapToDouble(item -> item.price() * item.quantity()).sum();
+        BillCalculation calc = calculateBill(business, customerState, items);
         String signupUrl = buildSignupUrl(businessId);
 
-        String pdfUrl = billPdfService.generateBillPdf(business, customer, items, total, signupUrl);
+        String pdfUrl = billPdfService.generateBillPdf(business, customer, calc, signupUrl);
         return new GenerateBillPdfResponse(pdfUrl, business.getName());
+    }
+
+    private BillCalculation calculateBill(Business business, String customerState, List<BillItemRequest> items) {
+        String effectiveCustomerState = (customerState == null || customerState.isBlank())
+                ? business.getBusinessState()
+                : customerState;
+
+        boolean interState = business.getBusinessState() != null
+                && effectiveCustomerState != null
+                && !business.getBusinessState().trim().equalsIgnoreCase(effectiveCustomerState.trim());
+
+        List<BillLineCalculation> lines = new ArrayList<>();
+        BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal totalCgst = BigDecimal.ZERO;
+        BigDecimal totalSgst = BigDecimal.ZERO;
+        BigDecimal totalIgst = BigDecimal.ZERO;
+        boolean hasTax = false;
+
+        for (BillItemRequest item : items) {
+            BigDecimal lineSubtotal = BigDecimal.valueOf(item.price()).multiply(BigDecimal.valueOf(item.quantity()));
+            subtotal = subtotal.add(lineSubtotal);
+
+            BigDecimal gstRate = item.gstRate();
+            BigDecimal taxAmount = BigDecimal.ZERO;
+            BigDecimal cgst = BigDecimal.ZERO;
+            BigDecimal sgst = BigDecimal.ZERO;
+            BigDecimal igst = BigDecimal.ZERO;
+
+            if (gstRate != null && gstRate.compareTo(BigDecimal.ZERO) > 0) {
+                hasTax = true;
+                taxAmount = lineSubtotal.multiply(gstRate)
+                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+                if (interState) {
+                    igst = taxAmount;
+                } else {
+                    cgst = taxAmount.divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
+                    sgst = taxAmount.subtract(cgst);
+                }
+
+                totalCgst = totalCgst.add(cgst);
+                totalSgst = totalSgst.add(sgst);
+                totalIgst = totalIgst.add(igst);
+            }
+
+            lines.add(new BillLineCalculation(item.name(), item.quantity(), item.price(), lineSubtotal, gstRate, taxAmount, cgst, sgst, igst));
+        }
+
+        BigDecimal grandTotal = subtotal.add(totalCgst).add(totalSgst).add(totalIgst);
+
+        return new BillCalculation(lines, hasTax, interState, subtotal, totalCgst, totalSgst, totalIgst, grandTotal);
+    }
+
+    private String formatRate(BigDecimal gstRate) {
+        return gstRate == null ? "0" : gstRate.stripTrailingZeros().toPlainString();
     }
 
     private void validateBillItems(List<BillItemRequest> items) {
@@ -333,6 +409,9 @@ public List<Customer> getExpiringMemberships(Long businessId) {
         for (BillItemRequest item : items) {
             if (item.quantity() <= 0) {
                 throw new IllegalArgumentException("Quantity must be greater than 0 for item: " + item.name());
+            }
+            if (item.gstRate() != null && item.gstRate().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("GST rate cannot be negative for item: " + item.name());
             }
         }
     }
