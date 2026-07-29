@@ -115,6 +115,7 @@
     .item-row .item-name { flex: 2; }
     .item-row .item-qty { flex: 1; }
     .item-row .item-price { flex: 1; }
+    .item-row .item-gst { flex: 1; }
     .remove-item-btn {
         width: 32px;
         height: 32px;
@@ -188,7 +189,7 @@
         return;
     }
 
-    var items = [{ name: "", price: "", quantity: "1" }];
+    var items = [{ name: "", price: "", quantity: "1", gstRate: "" }];
     var selectedCustomer = null;
 
     function escapeAttr(str) {
@@ -212,6 +213,8 @@
         '<button type="button" id="findCustomerBtn" class="btn-inline">Find</button>' +
         '</div>' +
         '<div class="empty-note" id="customerResult"></div>' +
+        '<label for="customerState">Customer state (optional, for inter-state GST)</label>' +
+        '<input type="text" id="customerState" placeholder="Leave blank if same as your business state">' +
         '<label>Items</label>' +
         '<div id="itemRows"></div>' +
         '<button type="button" id="addItemBtn" class="secondary">+ Add item</button>' +
@@ -221,6 +224,7 @@
         '<div id="waLinkContainer"></div>';
 
     var customerPhoneInput = document.getElementById("customerPhone");
+    var customerStateInput = document.getElementById("customerState");
     var customerResult = document.getElementById("customerResult");
     var generateBtn = document.getElementById("generateBtn");
     var message = document.getElementById("message");
@@ -234,6 +238,7 @@
                 '<input type="text" class="item-name" data-index="' + i + '" placeholder="Item name" value="' + escapeAttr(item.name) + '">' +
                 '<input type="number" class="item-qty" data-index="' + i + '" placeholder="Qty" min="1" step="1" value="' + escapeAttr(item.quantity) + '">' +
                 '<input type="number" class="item-price" data-index="' + i + '" placeholder="Price" min="0" step="0.01" value="' + escapeAttr(item.price) + '">' +
+                '<input type="number" class="item-gst" data-index="' + i + '" placeholder="GST %" min="0" step="0.01" value="' + escapeAttr(item.gstRate) + '">' +
                 (items.length > 1 ? '<button type="button" class="remove-item-btn" data-index="' + i + '">&times;</button>' : '') +
                 '</div>';
         }).join("");
@@ -253,6 +258,11 @@
                 items[Number(input.dataset.index)].price = input.value;
             });
         });
+        Array.prototype.forEach.call(container.querySelectorAll(".item-gst"), function (input) {
+            input.addEventListener("input", function () {
+                items[Number(input.dataset.index)].gstRate = input.value;
+            });
+        });
         Array.prototype.forEach.call(container.querySelectorAll(".remove-item-btn"), function (btn) {
             btn.addEventListener("click", function () {
                 items.splice(Number(btn.dataset.index), 1);
@@ -264,7 +274,7 @@
     renderItemRows();
 
     document.getElementById("addItemBtn").addEventListener("click", function () {
-        items.push({ name: "", price: "", quantity: "1" });
+        items.push({ name: "", price: "", quantity: "1", gstRate: "" });
         renderItemRows();
     });
 
@@ -319,7 +329,11 @@
                     item.quantity !== "" && !isNaN(parseInt(item.quantity, 10)) && parseInt(item.quantity, 10) > 0;
             })
             .map(function (item) {
-                return { name: item.name.trim(), price: parseFloat(item.price), quantity: parseInt(item.quantity, 10) };
+                var mapped = { name: item.name.trim(), price: parseFloat(item.price), quantity: parseInt(item.quantity, 10) };
+                if (item.gstRate !== "" && item.gstRate != null && !isNaN(parseFloat(item.gstRate))) {
+                    mapped.gstRate = parseFloat(item.gstRate);
+                }
+                return mapped;
             });
 
         if (validItems.length === 0) {
@@ -331,10 +345,16 @@
         generateBtn.disabled = true;
         generateBtn.textContent = "Generating...";
 
+        var requestBody = { items: validItems };
+        var customerStateValue = customerStateInput.value.trim();
+        if (customerStateValue) {
+            requestBody.customerState = customerStateValue;
+        }
+
         fetch("/businesses/" + encodeURIComponent(businessId) + "/customers/" + encodeURIComponent(selectedCustomer.id) + "/generate-bill-pdf", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ items: validItems })
+            body: JSON.stringify(requestBody)
         })
             .then(function (res) {
                 if (!res.ok) throw new Error("Failed to generate bill");
