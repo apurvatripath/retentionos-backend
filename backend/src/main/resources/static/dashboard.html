@@ -89,6 +89,14 @@
         text-align: center;
     }
     .message.error { color: #b3261e; display: block; }
+    .message.success { color: var(--brand-dark); display: block; }
+
+    .settings-block {
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+    }
+    .settings-block button { margin-top: 12px; }
 
     .stats-grid {
         display: grid;
@@ -188,6 +196,10 @@
         sessionStorage.removeItem(STORAGE_KEY);
     }
 
+    function escapeAttr(str) {
+        return String(str || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    }
+
     var session = loadSession();
     if (session) {
         renderDashboard(session);
@@ -238,7 +250,8 @@
                     var newSession = {
                         token: data.token,
                         businessId: data.business.id,
-                        businessName: data.business.name
+                        businessName: data.business.name,
+                        businessState: data.business.businessState || ""
                     };
                     saveSession(newSession);
                     renderDashboard(newSession);
@@ -261,12 +274,60 @@
             '<div class="stat-card"><div class="stat-value" id="statReturning">-</div><div class="stat-label">Returning Customers</div></div>' +
             '</div>' +
             '<div class="customer-list" id="customerList"></div>' +
+            '<div class="settings-block">' +
+            '<label for="businessState">Business state (for GST)</label>' +
+            '<input type="text" id="businessState" placeholder="e.g. Uttar Pradesh" value="' + escapeAttr(session.businessState) + '">' +
+            '<button type="button" id="saveStateBtn" class="secondary">Save</button>' +
+            '<div class="message" id="stateMessage"></div>' +
+            '</div>' +
             '<button id="logoutBtn" class="secondary">Log out</button>' +
             '<div class="message error" id="message"></div>';
 
         document.getElementById("logoutBtn").addEventListener("click", function () {
             clearSession();
             renderLogin();
+        });
+
+        document.getElementById("saveStateBtn").addEventListener("click", function () {
+            var input = document.getElementById("businessState");
+            var stateMessage = document.getElementById("stateMessage");
+            var btn = document.getElementById("saveStateBtn");
+            var value = input.value.trim();
+
+            stateMessage.className = "message";
+            stateMessage.style.display = "none";
+            btn.disabled = true;
+            btn.textContent = "Saving...";
+
+            fetch("/businesses/" + encodeURIComponent(session.businessId) + "/business-state", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json", "X-Auth-Token": session.token },
+                body: JSON.stringify({ businessState: value })
+            })
+                .then(function (res) {
+                    if (res.status === 401) throw new Error("unauthorized");
+                    if (!res.ok) throw new Error("Failed to save");
+                    return res.json();
+                })
+                .then(function (data) {
+                    session.businessState = data.businessState || "";
+                    saveSession(session);
+                    stateMessage.className = "message success";
+                    stateMessage.textContent = "Saved.";
+                })
+                .catch(function (err) {
+                    if (err.message === "unauthorized") {
+                        clearSession();
+                        renderLogin("Your session expired. Please log in again.");
+                        return;
+                    }
+                    stateMessage.className = "message error";
+                    stateMessage.textContent = "Could not save. Please try again.";
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                    btn.textContent = "Save";
+                });
         });
 
         document.getElementById("statTotalCard").addEventListener("click", function () {

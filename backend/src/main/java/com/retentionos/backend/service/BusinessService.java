@@ -83,6 +83,16 @@ public LoginResponse login(String phone, String rawPassword) {
     return new LoginResponse(business, token);
 }
 
+public Business updateBusinessState(Long businessId, String token, String businessState) {
+    requireValidToken(businessId, token);
+
+    Business business = businessRepository.findById(businessId)
+            .orElseThrow(() -> new ResourceNotFoundException("Business not found"));
+
+    business.setBusinessState((businessState == null || businessState.isBlank()) ? null : businessState.trim());
+    return businessRepository.save(business);
+}
+
 public void requireValidToken(Long businessId, String token) {
     Business business = businessRepository.findById(businessId)
             .orElseThrow(() -> new ResourceNotFoundException("Business not found"));
