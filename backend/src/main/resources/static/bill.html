@@ -116,6 +116,13 @@
     .item-row .item-qty { flex: 1; }
     .item-row .item-price { flex: 1; }
     .item-row .item-gst { flex: 1; }
+    .item-row .item-save-catalog {
+        flex: 0 0 auto;
+        width: 18px;
+        height: 18px;
+        margin: 0;
+        cursor: pointer;
+    }
     .remove-item-btn {
         width: 32px;
         height: 32px;
@@ -189,8 +196,9 @@
         return;
     }
 
-    var items = [{ name: "", price: "", quantity: "1", gstRate: "" }];
+    var items = [{ name: "", price: "", quantity: "1", gstRate: "", saveToCatalog: false }];
     var selectedCustomer = null;
+    var catalogItems = [];
 
     function escapeAttr(str) {
         return String(str || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -216,6 +224,7 @@
         '<label for="customerState">Customer state (optional, for inter-state GST)</label>' +
         '<input type="text" id="customerState" placeholder="Leave blank if same as your business state">' +
         '<label>Items</label>' +
+        '<datalist id="itemCatalogList"></datalist>' +
         '<div id="itemRows"></div>' +
         '<button type="button" id="addItemBtn" class="secondary">+ Add item</button>' +
         '<button type="button" id="generateBtn" disabled>Generate &amp; Send Bill</button>' +
@@ -231,21 +240,60 @@
     var billPreview = document.getElementById("billPreview");
     var waLinkContainer = document.getElementById("waLinkContainer");
 
+    function findCatalogItem(name) {
+        var normalized = (name || "").trim().toLowerCase();
+        if (!normalized) return null;
+        return catalogItems.find(function (ci) {
+            return ci.name.trim().toLowerCase() === normalized;
+        }) || null;
+    }
+
+    function renderCatalogDatalist() {
+        var datalist = document.getElementById("itemCatalogList");
+        if (!datalist) return;
+        datalist.innerHTML = catalogItems.map(function (ci) {
+            return '<option value="' + escapeAttr(ci.name) + '">';
+        }).join("");
+    }
+
+    function loadCatalog() {
+        return fetch("/businesses/" + encodeURIComponent(businessId) + "/items")
+            .then(function (res) { return res.ok ? res.json() : []; })
+            .then(function (data) {
+                catalogItems = data || [];
+                renderCatalogDatalist();
+            })
+            .catch(function () {
+                catalogItems = [];
+            });
+    }
+
     function renderItemRows() {
         var container = document.getElementById("itemRows");
         container.innerHTML = items.map(function (item, i) {
             return '<div class="item-row">' +
-                '<input type="text" class="item-name" data-index="' + i + '" placeholder="Item name" value="' + escapeAttr(item.name) + '">' +
+                '<input type="text" class="item-name" list="itemCatalogList" data-index="' + i + '" placeholder="Item name" value="' + escapeAttr(item.name) + '">' +
                 '<input type="number" class="item-qty" data-index="' + i + '" placeholder="Qty" min="1" step="1" value="' + escapeAttr(item.quantity) + '">' +
                 '<input type="number" class="item-price" data-index="' + i + '" placeholder="Price" min="0" step="0.01" value="' + escapeAttr(item.price) + '">' +
                 '<input type="number" class="item-gst" data-index="' + i + '" placeholder="GST %" min="0" step="0.01" value="' + escapeAttr(item.gstRate) + '">' +
+                '<input type="checkbox" class="item-save-catalog" data-index="' + i + '" title="Save to catalog"' + (item.saveToCatalog ? " checked" : "") + '>' +
                 (items.length > 1 ? '<button type="button" class="remove-item-btn" data-index="' + i + '">&times;</button>' : '') +
                 '</div>';
         }).join("");
 
         Array.prototype.forEach.call(container.querySelectorAll(".item-name"), function (input) {
             input.addEventListener("input", function () {
-                items[Number(input.dataset.index)].name = input.value;
+                var idx = Number(input.dataset.index);
+                items[idx].name = input.value;
+
+                var match = findCatalogItem(input.value);
+                if (match) {
+                    items[idx].price = String(match.price);
+                    items[idx].gstRate = match.gstRate != null ? String(match.gstRate) : "";
+                    var row = input.closest(".item-row");
+                    row.querySelector(".item-price").value = items[idx].price;
+                    row.querySelector(".item-gst").value = items[idx].gstRate;
+                }
             });
         });
         Array.prototype.forEach.call(container.querySelectorAll(".item-qty"), function (input) {
@@ -263,6 +311,11 @@
                 items[Number(input.dataset.index)].gstRate = input.value;
             });
         });
+        Array.prototype.forEach.call(container.querySelectorAll(".item-save-catalog"), function (checkbox) {
+            checkbox.addEventListener("change", function () {
+                items[Number(checkbox.dataset.index)].saveToCatalog = checkbox.checked;
+            });
+        });
         Array.prototype.forEach.call(container.querySelectorAll(".remove-item-btn"), function (btn) {
             btn.addEventListener("click", function () {
                 items.splice(Number(btn.dataset.index), 1);
@@ -272,9 +325,10 @@
     }
 
     renderItemRows();
+    loadCatalog();
 
     document.getElementById("addItemBtn").addEventListener("click", function () {
-        items.push({ name: "", price: "", quantity: "1", gstRate: "" });
+        items.push({ name: "", price: "", quantity: "1", gstRate: "", saveToCatalog: false });
         renderItemRows();
     });
 
@@ -333,6 +387,7 @@
                 if (item.gstRate !== "" && item.gstRate != null && !isNaN(parseFloat(item.gstRate))) {
                     mapped.gstRate = parseFloat(item.gstRate);
                 }
+                mapped.saveToCatalog = !!item.saveToCatalog;
                 return mapped;
             });
 
@@ -345,7 +400,12 @@
         generateBtn.disabled = true;
         generateBtn.textContent = "Generating...";
 
-        var requestBody = { items: validItems };
+        var billItems = validItems.map(function (item) {
+            var clean = { name: item.name, price: item.price, quantity: item.quantity };
+            if (item.gstRate !== undefined) clean.gstRate = item.gstRate;
+            return clean;
+        });
+        var requestBody = { items: billItems };
         var customerStateValue = customerStateInput.value.trim();
         if (customerStateValue) {
             requestBody.customerState = customerStateValue;
@@ -367,6 +427,36 @@
                 var waMessage = "Your bill from " + data.businessName + " is ready: " + data.pdfUrl;
                 var waLink = "https://wa.me/" + normalizePhone(selectedCustomer.phone) + "?text=" + encodeURIComponent(waMessage);
                 waLinkContainer.innerHTML = '<a class="wa-btn" href="' + waLink + '" target="_blank" rel="noopener noreferrer">Send via WhatsApp</a>';
+
+                var catalogRequests = [];
+                validItems.forEach(function (item) {
+                    if (!item.saveToCatalog) return;
+
+                    var existing = findCatalogItem(item.name);
+                    var body = { name: item.name, price: item.price };
+                    if (item.gstRate !== undefined) body.gstRate = item.gstRate;
+
+                    if (!existing) {
+                        catalogRequests.push(fetch("/businesses/" + encodeURIComponent(businessId) + "/items", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(body)
+                        }));
+                        return;
+                    }
+
+                    var existingGst = existing.gstRate != null ? Number(existing.gstRate) : undefined;
+                    if (existing.price !== item.price || existingGst !== item.gstRate) {
+                        catalogRequests.push(fetch("/businesses/" + encodeURIComponent(businessId) + "/items/" + existing.id, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(body)
+                        }));
+                    }
+                });
+                if (catalogRequests.length > 0) {
+                    Promise.all(catalogRequests).then(loadCatalog).catch(function () {});
+                }
             })
             .catch(function () {
                 message.textContent = "Could not generate bill. Please try again.";
