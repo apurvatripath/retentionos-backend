@@ -1,5 +1,11 @@
 HELP.md
 target/
+
+### Local secrets ###
+application-local.properties
+
+### Generated bill PDFs ###
+bills/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/

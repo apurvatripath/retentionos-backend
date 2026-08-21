@@ -1,9 +1,10 @@
 package com.retentionos.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -12,33 +13,20 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Customer {
+public class Item {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String name;
-
-    private String phone;
-
-    private LocalDate joinDate;
-
-    private LocalDate lastVisitDate;
-
-    private LocalDate lastPurchaseDate;
-
-    private LocalDate membershipExpiryDate;
-
-    private Integer checkInCount;
-
-    private String status;
-
-    private String notes;
-
-    private LocalDateTime createdAt;
+    private double price;
+    private BigDecimal gstRate;
 
     @ManyToOne
     @JoinColumn(name = "business_id")
+    @JsonIgnore
     private Business business;
+
+    private LocalDateTime createdAt;
 }

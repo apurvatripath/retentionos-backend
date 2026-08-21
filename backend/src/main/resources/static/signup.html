@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Join our loyalty list</title>
+<style>
+    :root {
+        --brand: #1f6f54;
+        --brand-dark: #144a38;
+        --ink: #1a1a1a;
+        --muted: #6b7280;
+        --border: #e2e2e2;
+        --bg: #fafaf7;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 24px;
+    }
+    .card {
+        width: 100%;
+        max-width: 420px;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 32px 28px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        text-align: center;
+    }
+    h1 {
+        font-size: 22px;
+        margin: 0 0 6px;
+    }
+    p.subtitle {
+        color: var(--muted);
+        margin: 0 0 24px;
+        font-size: 14px;
+    }
+    label {
+        display: block;
+        text-align: left;
+        font-size: 13px;
+        font-weight: 600;
+        margin: 16px 0 6px;
+    }
+    input[type="text"],
+    input[type="tel"] {
+        width: 100%;
+        padding: 12px 14px;
+        font-size: 16px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        outline: none;
+    }
+    input[type="text"]:focus,
+    input[type="tel"]:focus {
+        border-color: var(--brand);
+    }
+    button {
+        width: 100%;
+        margin-top: 24px;
+        padding: 14px;
+        font-size: 16px;
+        font-weight: 600;
+        color: #fff;
+        background: var(--brand);
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+    }
+    button:hover { background: var(--brand-dark); }
+    button:disabled { background: #a7a7a7; cursor: not-allowed; }
+    .message {
+        margin-top: 18px;
+        font-size: 14px;
+        display: none;
+    }
+    .message.success { color: var(--brand-dark); display: block; }
+    .message.error { color: #b3261e; display: block; }
+    .message.warning { color: #a15c00; display: block; }
+
+    /* QR generator (business-owner) view */
+    .qr-box img {
+        width: 260px;
+        height: 260px;
+        margin: 20px auto 0;
+        display: block;
+    }
+    .qr-url {
+        margin-top: 14px;
+        font-size: 12px;
+        color: var(--muted);
+        word-break: break-all;
+    }
+    .qr-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    .qr-actions button { margin-top: 0; }
+    .qr-actions .secondary {
+        background: #fff;
+        color: var(--brand-dark);
+        border: 1px solid var(--brand);
+    }
+    .qr-actions .secondary:hover { background: #f0f7f4; }
+
+    @media print {
+        body { background: #fff; padding: 0; }
+        .card { box-shadow: none; border: none; max-width: 100%; }
+        .qr-actions, label + input, form, .no-print { display: none !important; }
+        .qr-box img { width: 320px; height: 320px; }
+        h1 { font-size: 28px; }
+    }
+</style>
+</head>
+<body>
+<div class="card" id="card"></div>
+
+<script>
+(function () {
+    var QR_API = "https://api.qrserver.com/v1/create-qr-code/";
+    var BASE_URL = window.location.origin;
+    var params = new URLSearchParams(window.location.search);
+    var businessId = params.get("businessId");
+    var card = document.getElementById("card");
+
+    function buildSignupUrl(id) {
+        return BASE_URL + window.location.pathname + "?businessId=" + encodeURIComponent(id);
+    }
+
+    function qrImageUrl(targetUrl) {
+        return QR_API + "?size=300x300&data=" + encodeURIComponent(targetUrl);
+    }
+
+    if (!businessId) {
+        renderGenerator();
+    } else {
+        renderSignupForm(businessId);
+    }
+
+    function renderGenerator() {
+        var isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
+        card.innerHTML =
+            '<h1>Generate signup QR code</h1>' +
+            '<p class="subtitle">Enter your Business ID to create a printable QR code for the counter.</p>' +
+            (isLocalHost
+                ? '<div class="message warning">You opened this page as "' + window.location.hostname + '". A QR code generated here won\'t work when customers scan it on their own phones. Open this page using this computer\'s network address instead (e.g. http://192.168.x.x:8080/signup.html), then generate the code from there.</div>'
+                : '') +
+            '<label for="businessIdInput">Business ID</label>' +
+            '<input type="text" id="businessIdInput" placeholder="e.g. 5" inputmode="numeric">' +
+            '<button id="generateBtn" class="no-print">Generate QR code</button>' +
+            '<div id="qrResult"></div>';
+
+        document.getElementById("generateBtn").addEventListener("click", function () {
+            var id = document.getElementById("businessIdInput").value.trim();
+            if (!id) return;
+            var targetUrl = buildSignupUrl(id);
+            document.getElementById("qrResult").innerHTML =
+                '<div class="qr-box">' +
+                '<img src="' + qrImageUrl(targetUrl) + '" alt="Signup QR code">' +
+                '<div class="qr-url">' + targetUrl + '</div>' +
+                '<div class="qr-actions no-print">' +
+                '<button class="secondary" onclick="window.print()">Print</button>' +
+                '</div>' +
+                '</div>';
+        });
+    }
+
+    function renderSignupForm(id) {
+        card.innerHTML =
+            '<h1>Join our loyalty list</h1>' +
+            '<p class="subtitle">Leave your name and number, we will keep you posted.</p>' +
+            '<form id="signupForm">' +
+            '<label for="name">Name</label>' +
+            '<input type="text" id="name" name="name" required autocomplete="name">' +
+            '<label for="phone">Phone number</label>' +
+            '<input type="tel" id="phone" name="phone" required autocomplete="tel" placeholder="+91 98765 43210">' +
+            '<button type="submit" id="submitBtn">Sign me up</button>' +
+            '</form>' +
+            '<div class="message" id="message"></div>';
+
+        var form = document.getElementById("signupForm");
+        var submitBtn = document.getElementById("submitBtn");
+        var message = document.getElementById("message");
+
+        form.addEventListener("submit", function (e) {
+            e.preventDefault();
+            var name = document.getElementById("name").value.trim();
+            var phone = document.getElementById("phone").value.trim();
+            if (!name || !phone) return;
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Signing up...";
+            message.className = "message";
+            message.textContent = "";
+
+            fetch(BASE_URL + "/businesses/" + encodeURIComponent(id) + "/customers/signup", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: name, phone: phone })
+            })
+                .then(function (res) {
+                    if (!res.ok) throw new Error("Signup failed");
+                    return res.json();
+                })
+                .then(function (data) {
+                    form.reset();
+                    form.style.display = "none";
+                    message.className = "message success";
+                    message.textContent = data.checkIn
+                        ? "Welcome back, " + name + "!"
+                        : "You're all set, " + name + "!";
+                })
+                .catch(function () {
+                    message.className = "message error";
+                    message.textContent = "Something went wrong. Please try again or ask a staff member.";
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Sign me up";
+                });
+        });
+    }
+})();
+</script>
+</body>
+</html>

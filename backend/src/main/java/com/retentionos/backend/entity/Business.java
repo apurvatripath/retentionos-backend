@@ -2,6 +2,10 @@ package com.retentionos.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 
 import java.time.LocalDateTime;
 
@@ -25,6 +29,7 @@ public class Business {
     private BusinessType businessType;
 
     private String city;
+    private String businessState;
 
     private LocalDateTime trialStartDate;
     private LocalDateTime trialEndDate;
@@ -33,4 +38,15 @@ public class Business {
     private SubscriptionStatus subscriptionStatus;
 
     private LocalDateTime createdAt;
+    @OneToMany(mappedBy = "business")
+    @JsonIgnore
+    private List<Customer> customers;
+
+    @JsonIgnore
+    private String password;
+
+    @JsonIgnore
+    private String authToken;
+
+    private Integer messagesSent;
 }

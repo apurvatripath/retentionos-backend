@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RetentionOS Dashboard</title>
+<style>
+    :root {
+        --brand: #1f6f54;
+        --brand-dark: #144a38;
+        --ink: #1a1a1a;
+        --muted: #6b7280;
+        --border: #e2e2e2;
+        --bg: #fafaf7;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 24px;
+    }
+    .card {
+        width: 100%;
+        max-width: 480px;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 32px 28px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    .card.login { text-align: center; max-width: 380px; }
+    h1 {
+        font-size: 22px;
+        margin: 0 0 6px;
+    }
+    p.subtitle {
+        color: var(--muted);
+        margin: 0 0 24px;
+        font-size: 14px;
+    }
+    label {
+        display: block;
+        text-align: left;
+        font-size: 13px;
+        font-weight: 600;
+        margin: 16px 0 6px;
+    }
+    input[type="text"],
+    input[type="tel"],
+    input[type="password"] {
+        width: 100%;
+        padding: 12px 14px;
+        font-size: 16px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        outline: none;
+    }
+    input:focus { border-color: var(--brand); }
+    button {
+        width: 100%;
+        margin-top: 24px;
+        padding: 14px;
+        font-size: 16px;
+        font-weight: 600;
+        color: #fff;
+        background: var(--brand);
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+    }
+    button:hover { background: var(--brand-dark); }
+    button:disabled { background: #a7a7a7; cursor: not-allowed; }
+    button.secondary {
+        background: #fff;
+        color: var(--brand-dark);
+        border: 1px solid var(--brand);
+    }
+    button.secondary:hover { background: #f0f7f4; }
+    .message {
+        margin-top: 18px;
+        font-size: 14px;
+        display: none;
+        text-align: center;
+    }
+    .message.error { color: #b3261e; display: block; }
+    .message.success { color: var(--brand-dark); display: block; }
+
+    .settings-block {
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+    }
+    .settings-block button { margin-top: 12px; }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 8px;
+    }
+    .stat-card {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px 14px;
+        text-align: center;
+    }
+    .stat-card.clickable { cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+    .stat-card.clickable:hover { background: #eef5f1; border-color: var(--brand); }
+    .stat-value {
+        font-size: 30px;
+        font-weight: 700;
+        color: var(--brand-dark);
+        line-height: 1.1;
+    }
+    .stat-label {
+        margin-top: 4px;
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .customer-list {
+        margin-top: 16px;
+        display: none;
+    }
+    .customer-list.visible { display: block; }
+    .list-heading {
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 8px;
+    }
+    .inactive-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 14px;
+    }
+    .inactive-row:last-child { border-bottom: none; }
+    .inactive-row .name { font-weight: 600; }
+    .inactive-row .phone { color: var(--muted); }
+    .empty-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
+
+    .message-row {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 14px;
+    }
+    .message-row:last-child { border-bottom: none; }
+    .message-row .name { font-weight: 600; }
+    .message-row .phone { color: var(--muted); font-size: 13px; }
+    .message-row .draft {
+        margin-top: 6px;
+        font-size: 13px;
+        color: var(--ink);
+        white-space: pre-wrap;
+    }
+    .wa-btn {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 8px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #fff;
+        background: #25D366;
+        border-radius: 8px;
+        text-decoration: none;
+    }
+    .wa-btn:hover { background: #1ebe57; }
+</style>
+</head>
+<body>
+<div class="card" id="card"></div>
+
+<script>
+(function () {
+    var card = document.getElementById("card");
+    var STORAGE_KEY = "retentionos_session";
+
+    function saveSession(session) {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    }
+
+    function loadSession() {
+        var raw = sessionStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+    }
+
+    function clearSession() {
+        sessionStorage.removeItem(STORAGE_KEY);
+    }
+
+    function escapeAttr(str) {
+        return String(str || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    }
+
+    var session = loadSession();
+    if (session) {
+        renderDashboard(session);
+    } else {
+        renderLogin();
+    }
+
+    function renderLogin(errorText) {
+        card.className = "card login";
+        card.innerHTML =
+            '<h1>RetentionOS</h1>' +
+            '<p class="subtitle">Log in with your business phone number and password.</p>' +
+            '<form id="loginForm">' +
+            '<label for="phone">Phone number</label>' +
+            '<input type="tel" id="phone" required autocomplete="tel">' +
+            '<label for="password">Password</label>' +
+            '<input type="password" id="password" required autocomplete="current-password">' +
+            '<button type="submit" id="loginBtn">Log in</button>' +
+            '</form>' +
+            '<div class="message error" id="message">' + (errorText || "") + '</div>';
+
+        if (errorText) {
+            document.getElementById("message").style.display = "block";
+        }
+
+        var form = document.getElementById("loginForm");
+        var loginBtn = document.getElementById("loginBtn");
+
+        form.addEventListener("submit", function (e) {
+            e.preventDefault();
+            var phone = document.getElementById("phone").value.trim();
+            var password = document.getElementById("password").value;
+            if (!phone || !password) return;
+
+            loginBtn.disabled = true;
+            loginBtn.textContent = "Logging in...";
+
+            fetch("/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: phone, password: password })
+            })
+                .then(function (res) {
+                    if (!res.ok) throw new Error("Login failed");
+                    return res.json();
+                })
+                .then(function (data) {
+                    var newSession = {
+                        token: data.token,
+                        businessId: data.business.id,
+                        businessName: data.business.name,
+                        businessState: data.business.businessState || ""
+                    };
+                    saveSession(newSession);
+                    renderDashboard(newSession);
+                })
+                .catch(function () {
+                    renderLogin("Incorrect phone or password.");
+                });
+        });
+    }
+
+    function renderDashboard(session) {
+        card.className = "card";
+        card.innerHTML =
+            '<h1>' + session.businessName + '</h1>' +
+            '<p class="subtitle">Here is how things are looking today.</p>' +
+            '<div class="stats-grid">' +
+            '<div class="stat-card clickable" id="statTotalCard"><div class="stat-value" id="statTotal">-</div><div class="stat-label">Total Customers</div></div>' +
+            '<div class="stat-card clickable" id="statInactiveCard"><div class="stat-value" id="statInactive">-</div><div class="stat-label">Inactive Customers</div></div>' +
+            '<div class="stat-card"><div class="stat-value" id="statSent">-</div><div class="stat-label">Messages Sent</div></div>' +
+            '<div class="stat-card"><div class="stat-value" id="statReturning">-</div><div class="stat-label">Returning Customers</div></div>' +
+            '</div>' +
+            '<div class="customer-list" id="customerList"></div>' +
+            '<div class="settings-block">' +
+            '<label for="businessState">Business state (for GST)</label>' +
+            '<input type="text" id="businessState" placeholder="e.g. Uttar Pradesh" value="' + escapeAttr(session.businessState) + '">' +
+            '<button type="button" id="saveStateBtn" class="secondary">Save</button>' +
+            '<div class="message" id="stateMessage"></div>' +
+            '</div>' +
+            '<button id="logoutBtn" class="secondary">Log out</button>' +
+            '<div class="message error" id="message"></div>';
+
+        document.getElementById("logoutBtn").addEventListener("click", function () {
+            clearSession();
+            renderLogin();
+        });
+
+        document.getElementById("saveStateBtn").addEventListener("click", function () {
+            var input = document.getElementById("businessState");
+            var stateMessage = document.getElementById("stateMessage");
+            var btn = document.getElementById("saveStateBtn");
+            var value = input.value.trim();
+
+            stateMessage.className = "message";
+            stateMessage.style.display = "none";
+            btn.disabled = true;
+            btn.textContent = "Saving...";
+
+            fetch("/businesses/" + encodeURIComponent(session.businessId) + "/business-state", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json", "X-Auth-Token": session.token },
+                body: JSON.stringify({ businessState: value })
+            })
+                .then(function (res) {
+                    if (res.status === 401) throw new Error("unauthorized");
+                    if (!res.ok) throw new Error("Failed to save");
+                    return res.json();
+                })
+                .then(function (data) {
+                    session.businessState = data.businessState || "";
+                    saveSession(session);
+                    stateMessage.className = "message success";
+                    stateMessage.textContent = "Saved.";
+                })
+                .catch(function (err) {
+                    if (err.message === "unauthorized") {
+                        clearSession();
+                        renderLogin("Your session expired. Please log in again.");
+                        return;
+                    }
+                    stateMessage.className = "message error";
+                    stateMessage.textContent = "Could not save. Please try again.";
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                    btn.textContent = "Save";
+                });
+        });
+
+        document.getElementById("statTotalCard").addEventListener("click", function () {
+            loadCustomerList(session, "all");
+        });
+
+        document.getElementById("statInactiveCard").addEventListener("click", function () {
+            loadCustomerList(session, "inactive");
+        });
+
+        loadStats(session);
+    }
+
+    function loadStats(session) {
+        fetch("/businesses/" + encodeURIComponent(session.businessId) + "/dashboard-stats", {
+            headers: { "X-Auth-Token": session.token }
+        })
+            .then(function (res) {
+                if (res.status === 401) throw new Error("unauthorized");
+                if (!res.ok) throw new Error("Failed to load stats");
+                return res.json();
+            })
+            .then(function (data) {
+                document.getElementById("statTotal").textContent = data.totalCustomers;
+                document.getElementById("statInactive").textContent = data.inactiveCustomers;
+                document.getElementById("statSent").textContent = data.messagesSent;
+                document.getElementById("statReturning").textContent = data.returningCustomers;
+            })
+            .catch(function (err) {
+                if (err.message === "unauthorized") {
+                    clearSession();
+                    renderLogin("Your session expired. Please log in again.");
+                } else {
+                    document.getElementById("message").style.display = "block";
+                    document.getElementById("message").textContent = "Could not load stats.";
+                }
+            });
+    }
+
+    function normalizePhone(phone) {
+        var digits = (phone || "").replace(/\D/g, "");
+        if (digits.length === 10) {
+            digits = "91" + digits;
+        }
+        return digits;
+    }
+
+    function loadCustomerList(session, type) {
+        var list = document.getElementById("customerList");
+        var isInactive = type === "inactive";
+        var heading = isInactive ? "Inactive Customers" : "All Customers";
+        var url = "/businesses/" + encodeURIComponent(session.businessId) + (isInactive ? "/messages" : "/customers");
+
+        list.className = "customer-list visible";
+        list.innerHTML = '<div class="list-heading">' + heading + '</div><div class="empty-note">Loading...</div>';
+
+        fetch(url)
+            .then(function (res) {
+                if (!res.ok) throw new Error("Failed to load customers");
+                return res.json();
+            })
+            .then(function (items) {
+                var rows;
+                if (items.length === 0) {
+                    rows = '<div class="empty-note">No customers found.</div>';
+                } else if (isInactive) {
+                    rows = items.map(function (m) {
+                        var waLink = "https://wa.me/" + normalizePhone(m.phone) + "?text=" + encodeURIComponent(m.message);
+                        return '<div class="message-row">' +
+                            '<div class="name">' + m.customerName + '</div>' +
+                            '<div class="phone">' + m.phone + '</div>' +
+                            '<div class="draft">' + m.message + '</div>' +
+                            '<a class="wa-btn" href="' + waLink + '" target="_blank" rel="noopener noreferrer">Send via WhatsApp</a>' +
+                            '</div>';
+                    }).join("");
+                } else {
+                    rows = items.map(function (c) {
+                        return '<div class="inactive-row"><span class="name">' + c.name +
+                            '</span><span class="phone">' + c.phone + '</span></div>';
+                    }).join("");
+                }
+                list.innerHTML = '<div class="list-heading">' + heading + ' (' + items.length + ')</div>' + rows;
+            })
+            .catch(function () {
+                list.innerHTML = '<div class="list-heading">' + heading + '</div><div class="empty-note">Could not load customers.</div>';
+            });
+    }
+})();
+</script>
+</body>
+</html>

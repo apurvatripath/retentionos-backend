@@ -4,5 +4,6 @@ public enum BusinessType {
     GYM,
     RESTAURANT,
     SALON,
+    RETAIL,
     OTHER
 }
